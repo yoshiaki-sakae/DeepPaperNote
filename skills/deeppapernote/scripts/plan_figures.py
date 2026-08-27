@@ -65,7 +65,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
         r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
         text,
     ):
-        return "main_result", "关键结果", "这张图或表直接承载主结果，适合放在关键结果部分。"
+        return "main_result", "主要な結果", "この図または表は主要な結果を直接担っており、主要な結果セクションに配置するのが適切である。"
     if any(
         token in text
         for token in [
@@ -79,7 +79,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "identification of studies",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解综述证据来源。"
+        return "data_or_task_overview", "データとタスク定義", "この図は文献のスクリーニングや選定フローを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がレビューの証拠の出所を理解する助けにするのが適切である。"
     if any(
         token in text
         for token in [
@@ -94,7 +94,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "process",
         ]
     ):
-        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
+        return "method_overview", "機構フロー", "この図は手法全体またはシステムのフローを俯瞰している。マッチの信頼度が十分に高ければ、`### 機構フロー` に配置し、実行チェーンの理解を素早く構築する助けにするのが最適である。"
     if any(
         token in text
         for token in [
@@ -108,7 +108,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "issue",
         ]
     ):
-        return "data_or_task_overview", "数据与任务定义", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解数据来源。"
+        return "data_or_task_overview", "データとタスク定義", "この図はタスクやデータセットがどのように構築されるかを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がデータの出所を理解する助けにするのが適切である。"
     if any(
         token in text
         for token in [
@@ -125,7 +125,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "attribute",
         ]
     ):
-        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
+        return "data_or_task", "データとタスク定義", "この図はタスク設定やデータの説明に近く、データとタスク定義に配置するのが最も適切である。"
     if any(
         token in text
         for token in [
@@ -142,10 +142,10 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "block translation",
         ]
     ):
-        return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
+        return "method_detail", "手法の骨子", "この図は手法の内部機構や重要な実行状態を説明しており、手法の骨子セクションに機構詳細のプレースホルダとして配置するのが適切である。"
     if item_id.lower().startswith("table"):
-        return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
-    return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
+        return "table_result", "主要な結果", "これは主要な結果を示す表であり、主要な結果セクションに配置して中心的な数値の把握を補助するのが適切である。"
+    return "supporting_figure", "深掘り分析", "この図は補足図として適しており、深掘り分析セクションに配置して著者の主張の説明を助けるのが適切である。"
 
 
 def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:

@@ -20,46 +20,46 @@ from contracts import (
 REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
 
 CORE_INFO_FIELDS = [
-    "标题",
-    "标题翻译",
-    "作者",
-    "机构",
-    "发表时间",
-    "发表渠道",
+    "タイトル",
+    "タイトル訳",
+    "著者",
+    "所属",
+    "発表時期",
+    "発表媒体",
     "DOI",
     "arXiv",
-    "论文链接",
-    "代码 / 项目",
-    "数据 / 资源",
-    "论文类型",
+    "論文リンク",
+    "コード / プロジェクト",
+    "データ / リソース",
+    "論文タイプ",
 ]
 
 CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
 
 FIGURE_TARGET_SECTIONS = {
-    "研究问题",
-    "数据与任务定义",
-    "方法主线",
-    "关键结果",
-    "深度分析",
-    "局限",
-    "我的笔记",
+    "研究課題",
+    "データとタスク定義",
+    "手法の骨子",
+    "主要な結果",
+    "深掘り分析",
+    "限界",
+    "私のメモ",
 }
 
 FIGURE_BUCKET_RESIDUE_TOKENS = {
-    "剩余",
+    "残り",
     "残余",
-    "未放置",
-    "未处理",
-    "待补",
+    "未配置",
+    "未処理",
+    "補充待ち",
 }
 
 FIGURE_BUCKET_VISUAL_TOKENS = {
-    "图",
+    "図",
     "表",
-    "图片",
-    "图表",
-    "占位",
+    "画像",
+    "図表",
+    "プレースホルダ",
 }
 
 ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS = {
@@ -85,9 +85,9 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
     r"""(?ix)
     ^\s*
     (?:
-        \[\s*(?:图表|图片|图|表)\s*占位\s*\|[^\]]+\]
+        \[\s*(?:図表|画像|図|表)\s*プレースホルダ\s*\|[^\]]+\]
         |
-        (?:图表|图片|图|表)\s*占位\s*[:：]\s*\S+
+        (?:図表|画像|図|表)\s*プレースホルダ\s*[:：]\s*\S+
         |
         \[\s*(?:figure|fig|table)\s+placeholder\s*(?:\||:|\]|-|\s+(?:fig(?:ure)?|table)\.?\s*\d)
         |
@@ -99,9 +99,9 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
 REAL_IMAGE_STATUS_RE = re.compile(
     r"""
     (?:
-        已\s*(?:替换|插入|复制|拷贝|物化|写入)
+        (?:差し替え|挿入|コピー|複製|マテリアライズ|書き込み)\s*済み
         |
-        (?:替换|插入)\s*为\s*真实图片
+        実画像\s*(?:に|として)\s*(?:差し替え|挿入)
         |
         \b(?:inserted|replaced|copied|materialized)\b
     )
@@ -112,19 +112,19 @@ REAL_IMAGE_STATUS_RE = re.compile(
 USABLE_CANDIDATE_STATUS_RE = re.compile(
     r"""
     (?:
-        候选[^。；，\n>]{0,24}(?<!不)(?:可用|可读|清晰)
+        候補[^。；，\n>]{0,24}(?<!不)(?:使用可能|判読可能|鮮明)
         |
-        (?<!不)可用[^。；，\n>]{0,12}候选
+        (?<!不)使用可能[^。；，\n>]{0,12}候補
         |
-        (?:图像|图片|表格|图|表)?\s*裁剪[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
+        (?:画像|表|図)?\s*トリミング[^。；，\n>]{0,12}(?<!不)(?:使用可能|判読可能|鮮明)
         |
-        (?:图像|图片|表格|图|表)[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
+        (?:画像|表|図)[^。；，\n>]{0,12}(?<!不)(?:使用可能|判読可能|鮮明)
         |
-        图号\s*匹配
+        図番号\s*一致
         |
-        匹配度\s*高
+        一致度\s*高
         |
-        高\s*置信(?:度)?[^。；，\n>]{0,12}候选
+        高\s*信頼(?:度)?[^。；，\n>]{0,12}候補
         |
         usable\s+candidate
         |
@@ -141,11 +141,11 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
 USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
     r"""
     (?:
-        混入|污染|相邻|裁切|截断|切断|缺失|缺少|表体不完整|表格主体缺失|正文污染
+        混入|汚染|隣接|切り取り|切り詰め|切断|欠落|欠如|表本体が不完全|表本体の欠落|本文汚染
         |
-        只拿到|局部(?:子图|面板|截图|区域)|部分(?:子图|裁剪)
+        しか取得でき|局所(?:サブ図|パネル|切り出し|領域)|部分(?:サブ図|トリミング)
         |
-        无法稳定|不可独立解释|质量门|reject_visual_quality
+        安定的に復元できない|独立して解釈できない|品質ゲート|reject_visual_quality
         |
         partial|subpanel|contaminat|truncat|incomplete|missing
         |
@@ -158,13 +158,13 @@ USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
 USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
     r"""
     (?:
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|工具|copy)
+        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|ツール|copy)
         [^。；\n]{0,40}
-        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        (?:失敗|不足|拒否|denied|blocked|error|エラー)
         |
-        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        (?:失敗|不足|拒否|denied|blocked|error|エラー)
         [^。；\n]{0,40}
-        (?:materialize|物化|复制|拷贝|写入|权限|permission|copy)
+        (?:materialize|マテリアライズ|コピー|複製|書き込み|権限|permission|copy)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -173,13 +173,13 @@ USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
 MISSING_ASSET_MATERIALIZATION_RE = re.compile(
     r"""
     (?:
-        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+        (?:アセット欠落|見つからない|存在しない|欠如|asset_candidate_missing|candidate\s+missing)
         [^。；\n]{0,50}
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|copy|blocked)
         |
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|copy|blocked)
         [^。；\n]{0,50}
-        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+        (?:アセット欠落|見つからない|存在しない|欠如|asset_candidate_missing|candidate\s+missing)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -207,9 +207,9 @@ MECHANICAL_TRANSLATION_ARTIFACT_RE = re.compile(
     (?:
         [\u4e00-\u9fff]+(?:ing|ed|s)\b
         |
-        \b[A-Za-z]{2,}相关\b
+        \b[A-Za-z]{2,}関連\b
         |
-        [\u4e00-\u9fff](?:缓存|块)?\s+(?:of|with|for|on|in|from|and)\b
+        [\u4e00-\u9fff](?:キャッシュ|ブロック)?\s+(?:of|with|for|on|in|from|and)\b
         |
         \b(?:of|with|for|on|in|from|and)\s+[\u4e00-\u9fff]
         |
@@ -322,7 +322,7 @@ def find_missing_sections(text: str) -> list[str]:
 
 def front_matter_order_warnings(text: str) -> list[str]:
     warnings: list[str] = []
-    required_order = ["## 原文摘要翻译", "## 创新点", "## 一句话总结"]
+    required_order = ["## 要旨の翻訳", "## 新規性", "## 一言まとめ"]
     positions = []
     for section in required_order:
         idx = text.find(section)
@@ -364,13 +364,13 @@ def inspect_reference_hygiene(text: str) -> list[dict[str, object]]:
 
 
 METHOD_PAPER_SIGNAL_KEYWORDS = [
-    "模型",
-    "框架",
-    "系统",
-    "模块",
-    "编码器",
-    "解码器",
-    "预融合",
+    "モデル",
+    "フレームワーク",
+    "システム",
+    "モジュール",
+    "エンコーダ",
+    "デコーダ",
+    "事前融合",
     "attention",
     "encoder",
     "decoder",
@@ -379,25 +379,25 @@ METHOD_PAPER_SIGNAL_KEYWORDS = [
 ]
 
 MECHANISM_IO_TOKENS = [
-    "输入",
-    "输出",
-    "送入",
-    "送到",
+    "入力",
+    "出力",
+    "投入",
+    "渡す",
     "生成",
-    "得到",
+    "得る",
 ]
 
 MECHANISM_ACTION_TOKENS = [
     "融合",
     "投影",
-    "压缩",
-    "对齐",
-    "池化",
-    "提取",
-    "编码",
-    "解码",
-    "拼接",
-    "查询",
+    "圧縮",
+    "整列",
+    "プーリング",
+    "抽出",
+    "符号化",
+    "復号",
+    "連結",
+    "クエリ",
     "更新",
 ]
 
@@ -437,40 +437,40 @@ ENGLISH_FUNCTION_WORDS = {
 }
 
 PLACEHOLDER_ONLY_PATTERNS = [
-    r"^待补充[。.!！]*$",
+    r"^追記予定[。.!！]*$",
     r"^todo[。.!！]*$",
-    r"^暂无[。.!！]*$",
-    r"^略[。.!！]*$",
-    r"^参见原论文[。.!！]*$",
-    r"^这里记录.*[。.!！]*$",
-    r"^本节记录.*[。.!！]*$",
+    r"^なし[。.!！]*$",
+    r"^省略[。.!！]*$",
+    r"^原論文参照[。.!！]*$",
+    r"^ここに記録.*[。.!！]*$",
+    r"^本節に記録.*[。.!！]*$",
 ]
 
 GENERIC_INNOVATION_PATTERNS = [
-    r"本文提出(?:了)?一种新方法",
-    r"具有创新性",
+    r"新しい手法を提案(?:する|した)?",
+    r"新規性が(?:ある|高い)",
     r"novel approach",
-    r"首次实现",
+    r"初めて実現(?:した)?",
 ]
 
 GENERIC_KEY_RESULT_PATTERNS = [
-    r"实验结果表明方法有效",
-    r"结果表明.*有效",
-    r"取得(?:了)?较好效果",
-    r"性能.*优越",
+    r"実験結果.*手法.*有効",
+    r"結果.*有効(?:である|だ)",
+    r"良好な(?:結果|効果|性能)",
+    r"性能.*優(?:れ|位|越)",
 ]
 
 GENERIC_LIMITATION_PATTERNS = [
-    r"未来工作.*更多数据",
-    r"需要更多数据",
+    r"今後の(?:課題|研究).*データ",
+    r"(?:さらなる|より多くの)データが必要",
     r"future work can",
     r"more data",
-    r"后续.*扩展",
+    r"今後.*拡張",
 ]
 
-HONEST_MISSING_TOKENS = ("本文未给出", "论文未给出", "未报告", "没有报告", "未提供")
-HONEST_MISSING_BASIS_TOKENS = ("依据", "正文", "附录", "表格", "coverage", "作者")
-HONEST_MISSING_IMPACT_TOKENS = ("影响", "限制", "受限", "不能", "无法", "结论强度")
+HONEST_MISSING_TOKENS = ("未報告", "報告されていない", "未提供", "示されていない", "記載がない")
+HONEST_MISSING_BASIS_TOKENS = ("根拠", "本文", "付録", "表", "coverage", "著者")
+HONEST_MISSING_IMPACT_TOKENS = ("影響", "制限", "制約", "できない", "不可能", "結論強度")
 
 DOUBLE_ESCAPED_TEX_COMMANDS = {
     "alpha",
@@ -512,9 +512,9 @@ def is_exempt_line(line: str) -> bool:
         return True
     if (
         stripped.startswith("> [!figure]")
-        or stripped.startswith("> 建议位置：")
-        or stripped.startswith("> 放置原因：")
-        or stripped.startswith("> 当前状态：")
+        or stripped.startswith("> 推奨位置：")
+        or stripped.startswith("> 配置理由：")
+        or stripped.startswith("> 現在の状態：")
     ):
         return True
     if re.search(r"https?://", stripped):
@@ -556,7 +556,7 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         stripped = line.strip()
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {"核心信息", "引用"}:
+        if section_name in {"基本情報", "参考文献"}:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
@@ -620,11 +620,11 @@ def inspect_figure_callouts(text: str) -> list[str]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 建议位置："):
+            if nxt.startswith("> 推奨位置："):
                 has_location = True
-            if nxt.startswith("> 放置原因："):
+            if nxt.startswith("> 配置理由："):
                 has_reason = True
-            if nxt.startswith("> 当前状态："):
+            if nxt.startswith("> 現在の状態："):
                 has_status = True
             j += 1
         if not has_location:
@@ -648,9 +648,9 @@ def figure_callout_title(line: str) -> str:
 
 def figure_status_text(line: str) -> str:
     stripped = line.strip()
-    if not stripped.startswith("> 当前状态："):
+    if not stripped.startswith("> 現在の状態："):
         return ""
-    return stripped.removeprefix("> 当前状态：").strip()
+    return stripped.removeprefix("> 現在の状態：").strip()
 
 
 def has_accepted_usable_placeholder_reason(status_text: str) -> bool:
@@ -748,8 +748,8 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 建议位置："):
-                location = nxt.removeprefix("> 建议位置：").strip()
+            if nxt.startswith("> 推奨位置："):
+                location = nxt.removeprefix("> 推奨位置：").strip()
                 break
             j += 1
 
@@ -919,14 +919,14 @@ def figure_structure_passes(text: str) -> bool:
 
 
 def core_info_structure_issues(text: str) -> list[dict[str, object]]:
-    body = section_body(text, "核心信息")
+    body = section_body(text, "基本情報")
     if not body:
         return []
 
     issues: list[dict[str, object]] = []
     seen_fields: set[str] = set()
     last_known_index = -1
-    base_line = _line_number_from_offset(text, text.find("## 核心信息"))
+    base_line = _line_number_from_offset(text, text.find("## 基本情報"))
 
     for offset, raw_line in enumerate(body.splitlines(), start=1):
         stripped = raw_line.strip()
@@ -987,7 +987,7 @@ def is_prose_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", "*论文原图编号")):
+    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", "*論文原図番号")):
         return False
     if stripped.startswith("`") and stripped.endswith("`"):
         return False
@@ -1304,14 +1304,14 @@ def cleaned_section_lines(body: str) -> list[str]:
             continue
         if (
             stripped.startswith("> [!figure]")
-            or stripped.startswith("> 建议位置：")
-            or stripped.startswith("> 放置原因：")
-            or stripped.startswith("> 当前状态：")
+            or stripped.startswith("> 推奨位置：")
+            or stripped.startswith("> 配置理由：")
+            or stripped.startswith("> 現在の状態：")
         ):
             continue
         if stripped.startswith("!["):
             continue
-        if stripped.startswith("*论文原图编号：") and stripped.endswith("*"):
+        if stripped.startswith("*論文原図番号：") and stripped.endswith("*"):
             continue
         if stripped.startswith("> "):
             stripped = stripped[2:].strip()
@@ -1405,7 +1405,7 @@ def has_reference_entry(text: str) -> bool:
         return True
     if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
         return True
-    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
+    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会議|論文誌|arXiv)", normalized):
         return True
     return False
 
@@ -1417,53 +1417,53 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         content = normalized_section_content(body)
         if is_placeholder_like(content):
             issues.append(issue(section, "section_empty_shell", "error", content or section))
-        if section not in {"关键结果", "引用"} and is_honest_missing_declaration(content):
+        if section not in {"主要な結果", "参考文献"} and is_honest_missing_declaration(content):
             issues.append(issue(section, "section_honest_missing_not_allowed", "error", content))
 
-    innovation = section_body(text, "创新点")
+    innovation = section_body(text, "新規性")
     innovation_content = normalized_section_content(innovation)
     innovation_units = meaningful_units(innovation, GENERIC_INNOVATION_PATTERNS)
     if not innovation_units:
-        issues.append(issue("创新点", "innovation_empty_shell", "error", innovation_content))
+        issues.append(issue("新規性", "innovation_empty_shell", "error", innovation_content))
     elif len(innovation_units) < 2:
-        issues.append(issue("创新点", "innovation_too_few_specific_points", "warning", innovation_content))
+        issues.append(issue("新規性", "innovation_too_few_specific_points", "warning", innovation_content))
 
-    key_results = section_body(text, "关键结果")
+    key_results = section_body(text, "主要な結果")
     key_results_content = normalized_section_content(key_results)
     if is_honest_missing_declaration(key_results_content):
         issues.append(
             issue(
-                "关键结果",
+                "主要な結果",
                 "key_results_honest_missing_not_allowed",
                 "error",
                 key_results_content,
             )
         )
     elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
-        issues.append(issue("关键结果", "key_results_empty_shell", "error", key_results_content))
+        issues.append(issue("主要な結果", "key_results_empty_shell", "error", key_results_content))
     elif not has_number_token(key_results_content):
         issues.append(
             issue(
-                "关键结果",
+                "主要な結果",
                 "key_results_quantitative_result_missing",
                 "warning",
                 key_results_content,
             )
         )
 
-    references = section_body(text, "引用")
+    references = section_body(text, "参考文献")
     references_content = normalized_section_content(references)
     if is_honest_missing_declaration(references_content):
-        issues.append(issue("引用", "references_unavailable_declared", "warning", references_content))
+        issues.append(issue("参考文献", "references_unavailable_declared", "warning", references_content))
     elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue("引用", "references_placeholder", "error", references_content))
+        issues.append(issue("参考文献", "references_placeholder", "error", references_content))
 
-    limitations = section_body(text, "局限")
+    limitations = section_body(text, "限界")
     limitations_content = normalized_section_content(limitations)
     if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
-        issues.append(issue("局限", "limitations_empty_shell", "error", limitations_content))
+        issues.append(issue("限界", "limitations_empty_shell", "error", limitations_content))
 
-    for section in ("方法主线", "深度分析"):
+    for section in ("手法の骨子", "深掘り分析"):
         body = section_body(text, section)
         content = normalized_section_content(body)
         if not meaningful_units(body):
@@ -1481,7 +1481,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
 
 
 def method_section_requires_mechanism_flow(text: str) -> bool:
-    body = section_body(text, "方法主线")
+    body = section_body(text, "手法の骨子")
     if not body:
         return False
     lower = body.lower()
@@ -1494,11 +1494,11 @@ def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
     if not method_section_requires_mechanism_flow(text):
         return warnings
-    if "### 机制流程" not in text:
+    if "### 機構フロー" not in text:
         warnings.append("mechanism_flow_subsection_missing")
         return warnings
 
-    body = subsection_body(text, "方法主线", "机制流程")
+    body = subsection_body(text, "手法の骨子", "機構フロー")
     if not body:
         warnings.append("mechanism_flow_subsection_empty")
         return warnings

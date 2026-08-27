@@ -1,6 +1,6 @@
 ---
 name: deeppapernote
-description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders.
+description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders. Generates the note in Japanese by default (デフォルトで日本語の精読ノートを生成する). Japanese triggers: 「この論文の精読ノートを作って」「この論文をObsidianノートにまとめて」「論文を読んで日本語のMarkdownノートにして」.
 ---
 
 # DeepPaperNote
@@ -10,11 +10,11 @@ Use this skill when the user wants one outcome:
 - generate a high-quality Markdown note
 - save the note into an Obsidian-style vault when configured, or into the current workspace when no vault is configured
 
-Chinese trigger examples:
-- `给这篇论文生成深度笔记`
-- `写一篇高质量论文精读笔记`
-- `把这篇文章整理成 obsidian 笔记`
-- `读这篇论文并生成 md 笔记`
+日本語のトリガー例:
+- `この論文の精読ノートを作って`
+- `この論文をObsidianノートにまとめて`
+- `この論文を読んで高品質なMarkdownノートを生成して`
+- `この論文を読んで md ノートにして`
 
 This skill is intentionally narrow:
 - it handles one paper at a time
@@ -73,15 +73,15 @@ Global no-short-circuit rule:
   - stop and report which stage is blocked and which downstream required stages remain incomplete
 - do not describe the whole task as complete while required downstream stages are still pending
 
-Completion-language rule:
-- say `笔记已完成` only when the required workflow is actually complete
-- say `已生成草稿` when drafting is done but lint, final readability review, or save is still pending
-- say `已通过校验` only when lint has actually been run and passed
-- say `已保存到 Obsidian` only when the write step has actually succeeded
-- do not treat `lint 已通过` as equivalent to `整篇笔记已经润色完成`
-- if final readability review is still pending, explicitly say the draft passed script lint but has not finished final language review
-- if the workflow stopped early, name the current stage and the still-missing required stages instead of using completion language
-- lint is a floor, not the writing objective
+完了表現のルール:
+- 必須ワークフローが実際に完了したときのみ `ノート完成` と言う
+- 草稿はできたが lint・最終可読性レビュー・保存がまだ残っているときは `草稿を生成済み` と言う
+- lint を実際に実行して通過したときのみ `検証を通過` と言う
+- 書き込みステップが実際に成功したときのみ `Obsidian に保存済み` と言う
+- `lint 通過` を `ノート全体の推敲が完了` と同義に扱わない
+- 最終可読性レビューがまだ残っている場合は、草稿はスクリプトの lint を通過したが最終的な言語レビューは未完了である、と明示する
+- ワークフローが途中で止まった場合は、完了表現を使わず、現在の段階と未達成の必須段階を明示する
+- lint は下限であり、執筆の目的ではない
 
 ## Core Execution Contract
 
@@ -92,10 +92,10 @@ Non-negotiable rules:
 - evidence-first: draft from the synthesis bundle, `source_manifest`, raw sections, coverage metadata, explicit `note_plan`, and inspected paper evidence; never finish from title/abstract/headings alone
 - raw-source authority: for ordinary PDFs, `*_raw_sections.jsonl` and `*_source_manifest.json` are the canonical reading material; old top-N evidence buckets, truncated `section_texts`, and `candidate_chunks` are not model-facing writing inputs
 - fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
-- model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final Chinese prose
-- required structure: include the canonical required sections, with `原文摘要翻译` before `一句话总结` and a dedicated `创新点` section immediately after `原文摘要翻译`
-- abstract translation: when abstract metadata exists, `原文摘要翻译` is a faithful Chinese translation of the original abstract, not a bilingual block and not the model's own summary
-- mechanism depth: method, framework, and system papers should include `### 机制流程` under `方法主线`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
+- model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and the final Japanese prose (最終的な日本語の文章)
+- required structure: include the canonical required sections, with `要旨の翻訳` before `一言まとめ` and a dedicated `新規性` section immediately after `要旨の翻訳`
+- abstract translation: when abstract metadata exists, `要旨の翻訳` is a faithful Japanese translation of the original abstract, not a bilingual block and not the model's own summary
+- mechanism depth: method, framework, and system papers should include `### 機構フロー` under `手法の骨子`, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
 - final quality gates: lint is a floor; after lint passes, first run `final_quality_review` for analytical depth, then run `final_readability_review` for language polish, and rerun lint if either review edits the note
 
@@ -141,20 +141,20 @@ Formal Save states:
 - Do not stop after a text-only draft just to ask whether the user wants figures inserted. Finish the figure replacement decision inside the same task unless the user explicitly asked for text only.
 - The note must use real heading levels: `#`, `##`, and `###`.
 - Every final note must start with an Obsidian YAML properties block above the `#` title heading. Include at least a `tags` field with a `papers/<domain>` value and useful `aliases`; include `date`, `doi`, or `arxiv_id` when known, and omit unavailable fields rather than inventing placeholders.
-- `## 核心信息` must be a fixed metadata block only. Use only these fields, in this order, as `- 字段名: 值` bullets: `标题`, `标题翻译`, `作者`, `机构`, `发表时间`, `发表渠道`, `DOI`, `arXiv`, `论文链接`, `代码 / 项目`, `数据 / 资源`, `论文类型`. Omit unavailable fields; put any guide sentence, takeaway, or analysis in `一句话总结` or a later section instead.
-- The note should include `原文摘要翻译` near the beginning when abstract metadata is available, before `一句话总结`.
-- When abstract metadata is available, `原文摘要翻译` should directly translate the original paper abstract into Chinese rather than restating it as your own summary.
-- The `原文摘要翻译` section itself should be Chinese-only; do not place English abstract sentences or English paragraph excerpts in that section.
-- Do not mix later judgments, innovation summaries, or hindsight explanations into `原文摘要翻译`; keep it as the original abstract translated into Chinese.
-- The note should include a dedicated `创新点` section immediately after `原文摘要翻译` and before `一句话总结`.
-- The `创新点` section should not be empty praise. It should enumerate the paper's actual innovations and briefly explain why each one matters.
+- `## 基本情報` must be a fixed metadata block only. Use only these fields, in this order, as `- フィールド名: 値` bullets: `タイトル`, `タイトル訳`, `著者`, `所属`, `発表時期`, `発表媒体`, `DOI`, `arXiv`, `論文リンク`, `コード / プロジェクト`, `データ / リソース`, `論文タイプ`. Omit unavailable fields; put any guide sentence, takeaway, or analysis in `一言まとめ` or a later section instead.
+- The note should include `要旨の翻訳` near the beginning when abstract metadata is available, before `一言まとめ`.
+- When abstract metadata is available, `要旨の翻訳` should directly translate the original paper abstract into Japanese rather than restating it as your own summary.
+- The `要旨の翻訳` section itself should be Japanese-only; do not place English abstract sentences or English paragraph excerpts in that section.
+- Do not mix later judgments, innovation summaries, or hindsight explanations into `要旨の翻訳`; keep it as the original abstract translated into Japanese.
+- The note should include a dedicated `新規性` section immediately after `要旨の翻訳` and before `一言まとめ`.
+- The `新規性` section should not be empty praise. It should enumerate the paper's actual innovations and briefly explain why each one matters.
 - High-quality notes should usually contain multiple meaningful `###` subheadings in the technical sections when the paper is non-trivial.
 - Generate the complete figure/table decision table and satisfy the generated `writing_contract.figure_table_contract` before drafting or saving.
 - After the synthesis bundle is built, complete the model-led Visual Review Gate and Figure/Table Decision Freeze before creating `note_plan`; no `review_pending` item may cross that boundary.
 - Pass the grounding and final-note figure gates before advancing; revise any failed decision coverage, insertion, structure, or status check.
 - An `insert` decision is complete only after Formal Save materializes the selected image into the paper-local `images/` directory and the write succeeds.
-- The note must pass a style gate: no mixed Chinese-English prose lines except stable proper nouns or citation metadata.
-- The style gate also rejects mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
+- The note must pass a style gate: no lines that mix Japanese prose with untranslated English sentences, except stable technical terms, proper nouns, or citation metadata.
+- The style gate also rejects mechanical term-replacement artifacts such as `KVキャッシュ of`, `バッチ化ing`, `関連 Researcher において`, or `単一 シーケンス generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.
 
@@ -172,7 +172,7 @@ Model-first rule:
 - central quantitative comparisons with three or more systems, settings, tasks, datasets, metrics, or ablation rows should normally be written as compact Markdown tables, followed by interpretation; do not leave the main result table as a loose bullet list when a table would be clearer
 - short papers still need a complete deep note: use the saved space to explain protocol details, ablations, limitations, and deployment or replication implications rather than compressing the note into a terse summary
 - after `final_quality_review` passes, reread the full note once more for readability; do not stop at formal compliance only
-- in `final_readability_review`, ordinary English phrase leftovers should usually be rewritten into natural Chinese, while stable proper nouns may remain in English
+- in `final_readability_review`, ordinary English phrase leftovers should usually be rewritten into natural Japanese, while stable proper nouns may remain in English
 - do not use `final_readability_review` to invent new facts, empty filler text, or shallower but safer wording just to satisfy lint
 
 The topic references above can improve difficult runs, but the normal execution path should not depend on reading all of them.

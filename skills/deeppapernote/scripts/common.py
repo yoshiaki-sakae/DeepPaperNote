@@ -2501,9 +2501,9 @@ DOMAIN_SECTION_ALIASES = {"application_domains": "domains"}
 DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
     "domains": [
         {
-            "label": "医疗健康",
+            "label": "医療・健康",
             "aliases": ["healthcare", "medical", "clinical medicine"],
-            "specialized_folders": ["心理健康"],
+            "specialized_folders": ["メンタルヘルス"],
             "keywords": [
                 "clinical",
                 "patient",
@@ -2573,7 +2573,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "机器人",
+            "label": "ロボティクス",
             "aliases": ["robotics", "robotic"],
             "keywords": [
                 "robot",
@@ -2589,7 +2589,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": ["diffusion policy"],
         },
         {
-            "label": "软件工程",
+            "label": "ソフトウェア工学",
             "aliases": ["software engineering"],
             "keywords": [
                 "software engineering",
@@ -2620,8 +2620,8 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "心理健康",
-            "route_to": "医疗健康",
+            "label": "メンタルヘルス",
+            "route_to": "医療・健康",
             "aliases": ["mental health", "psychology", "psychiatry"],
             "keywords": [
                 "depression",
@@ -2636,7 +2636,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "推荐系统",
+            "label": "推薦システム",
             "aliases": ["recommender systems", "recommendation"],
             "keywords": [
                 "recommendation",
@@ -2650,7 +2650,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
     ],
     "fallback_domains": [
         {
-            "label": "大模型",
+            "label": "大規模言語モデル",
             "aliases": ["llm", "large language model", "language model", "foundation model"],
             "keywords": [
                 "large language model",
@@ -2681,7 +2681,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "机器学习",
+            "label": "機械学習",
             "aliases": ["machine learning", "ml"],
             "keywords": [
                 "machine learning",
@@ -2974,10 +2974,10 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
 
     paper_type, _ = infer_paper_type(title, abstract)
     if paper_type == "clinical_or_psychology_empirical":
-        return "医疗健康"
+        return "医療・健康"
     if paper_type == "AI_method":
-        return "机器学习"
-    return "未分类"
+        return "機械学習"
+    return "未分類"
 
 
 def is_probable_paper_folder(path: Path) -> bool:

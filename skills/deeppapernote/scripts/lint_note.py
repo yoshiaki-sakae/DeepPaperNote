@@ -17,50 +17,21 @@ from contracts import (
     required_field_value_error,
 )
 
+from locales import get_locale
+
+_LOCALE = get_locale()
+
 REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
 
-CORE_INFO_FIELDS = [
-    "タイトル",
-    "タイトル訳",
-    "著者",
-    "所属",
-    "発表時期",
-    "発表媒体",
-    "DOI",
-    "arXiv",
-    "論文リンク",
-    "コード / プロジェクト",
-    "データ / リソース",
-    "論文タイプ",
-]
+CORE_INFO_FIELDS = _LOCALE["CORE_INFO_FIELDS"]
 
 CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
 
-FIGURE_TARGET_SECTIONS = {
-    "研究課題",
-    "データとタスク定義",
-    "手法の骨子",
-    "主要な結果",
-    "深掘り分析",
-    "限界",
-    "私のメモ",
-}
+FIGURE_TARGET_SECTIONS = _LOCALE["FIGURE_TARGET_SECTIONS"]
 
-FIGURE_BUCKET_RESIDUE_TOKENS = {
-    "残り",
-    "残余",
-    "未配置",
-    "未処理",
-    "補充待ち",
-}
+FIGURE_BUCKET_RESIDUE_TOKENS = _LOCALE["FIGURE_BUCKET_RESIDUE_TOKENS"]
 
-FIGURE_BUCKET_VISUAL_TOKENS = {
-    "図",
-    "表",
-    "画像",
-    "図表",
-    "プレースホルダ",
-}
+FIGURE_BUCKET_VISUAL_TOKENS = _LOCALE["FIGURE_BUCKET_VISUAL_TOKENS"]
 
 ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS = {
     "remaining",
@@ -322,7 +293,7 @@ def find_missing_sections(text: str) -> list[str]:
 
 def front_matter_order_warnings(text: str) -> list[str]:
     warnings: list[str] = []
-    required_order = ["## 要旨の翻訳", "## 新規性", "## 一言まとめ"]
+    required_order = _LOCALE["FRONT_MATTER_REQUIRED_ORDER"]
     positions = []
     for section in required_order:
         idx = text.find(section)
@@ -363,43 +334,11 @@ def inspect_reference_hygiene(text: str) -> list[dict[str, object]]:
     return issues
 
 
-METHOD_PAPER_SIGNAL_KEYWORDS = [
-    "モデル",
-    "フレームワーク",
-    "システム",
-    "モジュール",
-    "エンコーダ",
-    "デコーダ",
-    "事前融合",
-    "attention",
-    "encoder",
-    "decoder",
-    "pipeline",
-    "framework",
-]
+METHOD_PAPER_SIGNAL_KEYWORDS = _LOCALE["METHOD_PAPER_SIGNAL_KEYWORDS"]
 
-MECHANISM_IO_TOKENS = [
-    "入力",
-    "出力",
-    "投入",
-    "渡す",
-    "生成",
-    "得る",
-]
+MECHANISM_IO_TOKENS = _LOCALE["MECHANISM_IO_TOKENS"]
 
-MECHANISM_ACTION_TOKENS = [
-    "融合",
-    "投影",
-    "圧縮",
-    "整列",
-    "プーリング",
-    "抽出",
-    "符号化",
-    "復号",
-    "連結",
-    "クエリ",
-    "更新",
-]
+MECHANISM_ACTION_TOKENS = _LOCALE["MECHANISM_ACTION_TOKENS"]
 
 
 ENGLISH_FUNCTION_WORDS = {
@@ -436,41 +375,17 @@ ENGLISH_FUNCTION_WORDS = {
     "with",
 }
 
-PLACEHOLDER_ONLY_PATTERNS = [
-    r"^追記予定[。.!！]*$",
-    r"^todo[。.!！]*$",
-    r"^なし[。.!！]*$",
-    r"^省略[。.!！]*$",
-    r"^原論文参照[。.!！]*$",
-    r"^ここに記録.*[。.!！]*$",
-    r"^本節に記録.*[。.!！]*$",
-]
+PLACEHOLDER_ONLY_PATTERNS = _LOCALE["PLACEHOLDER_ONLY_PATTERNS"]
 
-GENERIC_INNOVATION_PATTERNS = [
-    r"新しい手法を提案(?:する|した)?",
-    r"新規性が(?:ある|高い)",
-    r"novel approach",
-    r"初めて実現(?:した)?",
-]
+GENERIC_INNOVATION_PATTERNS = _LOCALE["GENERIC_INNOVATION_PATTERNS"]
 
-GENERIC_KEY_RESULT_PATTERNS = [
-    r"実験結果.*手法.*有効",
-    r"結果.*有効(?:である|だ)",
-    r"良好な(?:結果|効果|性能)",
-    r"性能.*優(?:れ|位|越)",
-]
+GENERIC_KEY_RESULT_PATTERNS = _LOCALE["GENERIC_KEY_RESULT_PATTERNS"]
 
-GENERIC_LIMITATION_PATTERNS = [
-    r"今後の(?:課題|研究).*データ",
-    r"(?:さらなる|より多くの)データが必要",
-    r"future work can",
-    r"more data",
-    r"今後.*拡張",
-]
+GENERIC_LIMITATION_PATTERNS = _LOCALE["GENERIC_LIMITATION_PATTERNS"]
 
-HONEST_MISSING_TOKENS = ("未報告", "報告されていない", "未提供", "示されていない", "記載がない")
-HONEST_MISSING_BASIS_TOKENS = ("根拠", "本文", "付録", "表", "coverage", "著者")
-HONEST_MISSING_IMPACT_TOKENS = ("影響", "制限", "制約", "できない", "不可能", "結論強度")
+HONEST_MISSING_TOKENS = _LOCALE["HONEST_MISSING_TOKENS"]
+HONEST_MISSING_BASIS_TOKENS = _LOCALE["HONEST_MISSING_BASIS_TOKENS"]
+HONEST_MISSING_IMPACT_TOKENS = _LOCALE["HONEST_MISSING_IMPACT_TOKENS"]
 
 DOUBLE_ESCAPED_TEX_COMMANDS = {
     "alpha",
@@ -556,7 +471,7 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
         stripped = line.strip()
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {"基本情報", "参考文献"}:
+        if section_name in {_LOCALE["SEC_CORE_INFO"], _LOCALE["SEC_REFERENCES"]}:
             continue
         if not re.search(r"[\u4e00-\u9fff]", stripped):
             continue
@@ -919,7 +834,7 @@ def figure_structure_passes(text: str) -> bool:
 
 
 def core_info_structure_issues(text: str) -> list[dict[str, object]]:
-    body = section_body(text, "基本情報")
+    body = section_body(text, _LOCALE["SEC_CORE_INFO"])
     if not body:
         return []
 
@@ -1417,53 +1332,53 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
         content = normalized_section_content(body)
         if is_placeholder_like(content):
             issues.append(issue(section, "section_empty_shell", "error", content or section))
-        if section not in {"主要な結果", "参考文献"} and is_honest_missing_declaration(content):
+        if section not in {_LOCALE["SEC_KEY_RESULTS"], _LOCALE["SEC_REFERENCES"]} and is_honest_missing_declaration(content):
             issues.append(issue(section, "section_honest_missing_not_allowed", "error", content))
 
-    innovation = section_body(text, "新規性")
+    innovation = section_body(text, _LOCALE["SEC_INNOVATION"])
     innovation_content = normalized_section_content(innovation)
     innovation_units = meaningful_units(innovation, GENERIC_INNOVATION_PATTERNS)
     if not innovation_units:
-        issues.append(issue("新規性", "innovation_empty_shell", "error", innovation_content))
+        issues.append(issue(_LOCALE["SEC_INNOVATION"], "innovation_empty_shell", "error", innovation_content))
     elif len(innovation_units) < 2:
-        issues.append(issue("新規性", "innovation_too_few_specific_points", "warning", innovation_content))
+        issues.append(issue(_LOCALE["SEC_INNOVATION"], "innovation_too_few_specific_points", "warning", innovation_content))
 
-    key_results = section_body(text, "主要な結果")
+    key_results = section_body(text, _LOCALE["SEC_KEY_RESULTS"])
     key_results_content = normalized_section_content(key_results)
     if is_honest_missing_declaration(key_results_content):
         issues.append(
             issue(
-                "主要な結果",
+                _LOCALE["SEC_KEY_RESULTS"],
                 "key_results_honest_missing_not_allowed",
                 "error",
                 key_results_content,
             )
         )
     elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
-        issues.append(issue("主要な結果", "key_results_empty_shell", "error", key_results_content))
+        issues.append(issue(_LOCALE["SEC_KEY_RESULTS"], "key_results_empty_shell", "error", key_results_content))
     elif not has_number_token(key_results_content):
         issues.append(
             issue(
-                "主要な結果",
+                _LOCALE["SEC_KEY_RESULTS"],
                 "key_results_quantitative_result_missing",
                 "warning",
                 key_results_content,
             )
         )
 
-    references = section_body(text, "参考文献")
+    references = section_body(text, _LOCALE["SEC_REFERENCES"])
     references_content = normalized_section_content(references)
     if is_honest_missing_declaration(references_content):
-        issues.append(issue("参考文献", "references_unavailable_declared", "warning", references_content))
+        issues.append(issue(_LOCALE["SEC_REFERENCES"], "references_unavailable_declared", "warning", references_content))
     elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue("参考文献", "references_placeholder", "error", references_content))
+        issues.append(issue(_LOCALE["SEC_REFERENCES"], "references_placeholder", "error", references_content))
 
-    limitations = section_body(text, "限界")
+    limitations = section_body(text, _LOCALE["SEC_LIMITS"])
     limitations_content = normalized_section_content(limitations)
     if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
-        issues.append(issue("限界", "limitations_empty_shell", "error", limitations_content))
+        issues.append(issue(_LOCALE["SEC_LIMITS"], "limitations_empty_shell", "error", limitations_content))
 
-    for section in ("手法の骨子", "深掘り分析"):
+    for section in (_LOCALE["SEC_METHOD"], _LOCALE["SEC_DEEP_ANALYSIS"]):
         body = section_body(text, section)
         content = normalized_section_content(body)
         if not meaningful_units(body):
@@ -1481,7 +1396,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
 
 
 def method_section_requires_mechanism_flow(text: str) -> bool:
-    body = section_body(text, "手法の骨子")
+    body = section_body(text, _LOCALE["SEC_METHOD"])
     if not body:
         return False
     lower = body.lower()
@@ -1494,11 +1409,11 @@ def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
     if not method_section_requires_mechanism_flow(text):
         return warnings
-    if "### 機構フロー" not in text:
+    if f'### {_LOCALE["SUBSEC_MECHANISM"]}' not in text:
         warnings.append("mechanism_flow_subsection_missing")
         return warnings
 
-    body = subsection_body(text, "手法の骨子", "機構フロー")
+    body = subsection_body(text, _LOCALE["SEC_METHOD"], _LOCALE["SUBSEC_MECHANISM"])
     if not body:
         warnings.append("mechanism_flow_subsection_empty")
         return warnings

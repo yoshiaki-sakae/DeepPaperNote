@@ -21,6 +21,7 @@ from contracts import (
     PAPER_TYPE_VALUES,
     WRITING_CONTRACT_RULES,
 )
+from locales import get_locale
 
 
 def parser() -> argparse.ArgumentParser:
@@ -345,7 +346,7 @@ def compact_writing_contract() -> dict:
         analysis_coverage["final_quality_review_checks"]
     )
     return {
-        "language": "ja",
+        "language": get_locale()["OUTPUT_LANGUAGE_CODE"],
         "contract_role": "manifest_quality_contract",
         "canonical_source": (
             "SKILL.md defines the workflow; scripts/contracts.py defines "

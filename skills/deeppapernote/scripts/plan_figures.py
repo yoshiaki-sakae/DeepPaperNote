@@ -8,6 +8,10 @@ import re
 
 from common import caption_preference_score, maybe_load_json_record, normalize_whitespace
 
+from locales import get_locale
+
+_LOCALE = get_locale()
+
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__ or "plan figures")
@@ -65,7 +69,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
         r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
         text,
     ):
-        return "main_result", "主要な結果", "この図または表は主要な結果を直接担っており、主要な結果セクションに配置するのが適切である。"
+        return "main_result", _LOCALE["SEC_KEY_RESULTS"], "この図または表は主要な結果を直接担っており、主要な結果セクションに配置するのが適切である。"
     if any(
         token in text
         for token in [
@@ -79,7 +83,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "identification of studies",
         ]
     ):
-        return "data_or_task_overview", "データとタスク定義", "この図は文献のスクリーニングや選定フローを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がレビューの証拠の出所を理解する助けにするのが適切である。"
+        return "data_or_task_overview", _LOCALE["SEC_DATA_TASK"], "この図は文献のスクリーニングや選定フローを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がレビューの証拠の出所を理解する助けにするのが適切である。"
     if any(
         token in text
         for token in [
@@ -94,7 +98,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "process",
         ]
     ):
-        return "method_overview", "機構フロー", "この図は手法全体またはシステムのフローを俯瞰している。マッチの信頼度が十分に高ければ、`### 機構フロー` に配置し、実行チェーンの理解を素早く構築する助けにするのが最適である。"
+        return "method_overview", _LOCALE["SUBSEC_MECHANISM"], "この図は手法全体またはシステムのフローを俯瞰している。マッチの信頼度が十分に高ければ、`### 機構フロー` に配置し、実行チェーンの理解を素早く構築する助けにするのが最適である。"
     if any(
         token in text
         for token in [
@@ -108,7 +112,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "issue",
         ]
     ):
-        return "data_or_task_overview", "データとタスク定義", "この図はタスクやデータセットがどのように構築されるかを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がデータの出所を理解する助けにするのが適切である。"
+        return "data_or_task_overview", _LOCALE["SEC_DATA_TASK"], "この図はタスクやデータセットがどのように構築されるかを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がデータの出所を理解する助けにするのが適切である。"
     if any(
         token in text
         for token in [
@@ -125,7 +129,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "attribute",
         ]
     ):
-        return "data_or_task", "データとタスク定義", "この図はタスク設定やデータの説明に近く、データとタスク定義に配置するのが最も適切である。"
+        return "data_or_task", _LOCALE["SEC_DATA_TASK"], "この図はタスク設定やデータの説明に近く、データとタスク定義に配置するのが最も適切である。"
     if any(
         token in text
         for token in [
@@ -142,10 +146,10 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "block translation",
         ]
     ):
-        return "method_detail", "手法の骨子", "この図は手法の内部機構や重要な実行状態を説明しており、手法の骨子セクションに機構詳細のプレースホルダとして配置するのが適切である。"
+        return "method_detail", _LOCALE["SEC_METHOD"], "この図は手法の内部機構や重要な実行状態を説明しており、手法の骨子セクションに機構詳細のプレースホルダとして配置するのが適切である。"
     if item_id.lower().startswith("table"):
-        return "table_result", "主要な結果", "これは主要な結果を示す表であり、主要な結果セクションに配置して中心的な数値の把握を補助するのが適切である。"
-    return "supporting_figure", "深掘り分析", "この図は補足図として適しており、深掘り分析セクションに配置して著者の主張の説明を助けるのが適切である。"
+        return "table_result", _LOCALE["SEC_KEY_RESULTS"], "これは主要な結果を示す表であり、主要な結果セクションに配置して中心的な数値の把握を補助するのが適切である。"
+    return "supporting_figure", _LOCALE["SEC_DEEP_ANALYSIS"], "この図は補足図として適しており、深掘り分析セクションに配置して著者の主張の説明を助けるのが適切である。"
 
 
 def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:

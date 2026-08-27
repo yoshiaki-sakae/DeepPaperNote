@@ -1,6 +1,6 @@
 ---
 name: deeppapernote
-description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders. Generates the note in Japanese by default (デフォルトで日本語の精読ノートを生成する). Japanese triggers: 「この論文の精読ノートを作って」「この論文をObsidianノートにまとめて」「論文を読んで日本語のMarkdownノートにして」.
+description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders. Generates the note in Japanese by default (デフォルトで日本語の精読ノートを生成する). Japanese trigger phrases 「この論文の精読ノートを作って」「この論文をObsidianノートにまとめて」「論文を読んで日本語のMarkdownノートにして」.
 ---
 
 # DeepPaperNote

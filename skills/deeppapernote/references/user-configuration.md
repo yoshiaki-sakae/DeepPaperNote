@@ -4,7 +4,7 @@ DeepPaperNote can resolve a run entirely from Run Overrides. It also supports on
 
 For isolated validation only, `DEEPPAPERNOTE_CONFIG_PATH` may relocate this one file for the current process. It is not a preference, does not create a second configuration layer, and must not be persisted into the configuration itself.
 
-- `output_language`: `zh-CN` or `en`
+- `output_language`: `zh-CN`, `en`, or `ja`
 - `save_mode`: `workspace` or `obsidian`
 - `obsidian_vault`: existing absolute directory, required only in Obsidian mode
 - `papers_dir`: safe relative path inside the Vault, required only in Obsidian mode

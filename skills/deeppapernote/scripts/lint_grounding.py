@@ -191,7 +191,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--language",
         default="",
-        help="Run Override for output language: en or zh-CN.",
+        help="Run Override for output language: en, zh-CN, or ja.",
     )
     return p
 

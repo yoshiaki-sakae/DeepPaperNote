@@ -34,7 +34,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--language",
         default="",
-        choices=("", "en", "zh-CN"),
+        choices=("", "en", "zh-CN", "ja"),
         help="Run Override for the output language contract.",
     )
     p.add_argument("--save-mode", choices=("workspace", "obsidian"), default="")

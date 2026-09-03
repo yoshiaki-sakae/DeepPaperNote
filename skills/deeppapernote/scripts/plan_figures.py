@@ -17,7 +17,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--assets", default="", help="PDF assets JSON path or string.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Output language: en or zh-CN.")
+    p.add_argument("--language", default="", help="Output language: en, zh-CN, or ja.")
     p.add_argument("--max-items", type=int, default=12, help="Maximum number of figure/table items to keep. 0 means keep all.")
     return p
 
@@ -160,13 +160,29 @@ ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
     "supporting_figure": ("Deep Analysis", "This supporting visual helps explain the authors' argument in Deep Analysis."),
 }
 
+JAPANESE_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
+    "main_result": ("主要な結果", "この図表は主結果を担っており、主要な結果に置くのが適切である。"),
+    "data_or_task_overview": ("データとタスク定義", "この図はデータとタスクの出所・構築・選別・範囲を説明する。"),
+    "method_overview": ("機構フロー", "この図は手法またはシステムの流れを要約しており、対応が確実なら機構フローに置く。"),
+    "data_or_task": ("データとタスク定義", "この図はタスク設定・サンプル・データセットを明確にする。"),
+    "method_detail": ("手法の骨子", "この図は内部機構や実行状態を説明しており、手法の骨子に置くのが適切である。"),
+    "table_result": ("主要な結果", "この結果表は読者が中心的な数値的証拠を見つける助けになる。"),
+    "supporting_figure": ("深掘り分析", "この補助図は深掘り分析で著者の論点を説明する助けになる。"),
+}
+
+LOCALIZED_FIGURE_PLACEMENT: dict[str, dict[str, tuple[str, str]]] = {
+    "en": ENGLISH_FIGURE_PLACEMENT,
+    "ja": JAPANESE_FIGURE_PLACEMENT,
+}
+
 
 def classify_caption_kind(item_id: str, caption: str, language: str | None = None) -> tuple[str, str, str]:
     result = _classify_caption_kind_zh(item_id, caption)
-    if normalize_output_language(language) != "en":
+    placement = LOCALIZED_FIGURE_PLACEMENT.get(normalize_output_language(language))
+    if placement is None:
         return result
     kind = result[0]
-    section, reason = ENGLISH_FIGURE_PLACEMENT[kind]
+    section, reason = placement[kind]
     return kind, section, reason
 
 

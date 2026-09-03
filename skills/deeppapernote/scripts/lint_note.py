@@ -63,6 +63,11 @@ FIGURE_BUCKET_RESIDUE_TOKENS = {
     "未放置",
     "未处理",
     "待补",
+    # ja
+    "残り",
+    "未配置",
+    "未処理",
+    "補充待ち",
 }
 
 FIGURE_BUCKET_VISUAL_TOKENS = {
@@ -71,6 +76,11 @@ FIGURE_BUCKET_VISUAL_TOKENS = {
     "图片",
     "图表",
     "占位",
+    # ja
+    "図",
+    "画像",
+    "図表",
+    "プレースホルダ",
 }
 
 ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS = {
@@ -100,6 +110,10 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
         |
         (?:图表|图片|图|表)\s*占位\s*[:：]\s*\S+
         |
+        \[\s*(?:図表|画像|図|表)\s*プレースホルダ\s*\|[^\]]+\]
+        |
+        (?:図表|画像|図|表)\s*プレースホルダ\s*[:：]\s*\S+
+        |
         \[\s*(?:figure|fig|table)\s+placeholder\s*(?:\||:|\]|-|\s+(?:fig(?:ure)?|table)\.?\s*\d)
         |
         (?:figure|fig|table)\s+placeholder\s*(?:\||:|-|\s+(?:fig(?:ure)?|table)\.?\s*\d)
@@ -113,6 +127,10 @@ REAL_IMAGE_STATUS_RE = re.compile(
         已\s*(?:替换|插入|复制|拷贝|物化|写入)
         |
         (?:替换|插入)\s*为\s*真实图片
+        |
+        (?:置換|挿入|コピー|複製|書き込み|物化)\s*(?:済み|した|完了)
+        |
+        実(?:画像|図)(?:に|へ)\s*(?:置換|差し替え)
         |
         \b(?:inserted|replaced|copied|materialized)\b
     )
@@ -137,6 +155,14 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
         |
         高\s*置信(?:度)?[^。；，\n>]{0,12}候选
         |
+        候補[^。；，\n>]{0,24}(?<!不)(?:利用可能|使用可能|判読可能|鮮明)
+        |
+        (?:画像|図表|図|表)?\s*切り出し[^。；，\n>]{0,12}(?<!不)(?:利用可能|使用可能|判読可能|鮮明)
+        |
+        図番号\s*(?:が)?\s*一致
+        |
+        高\s*信頼(?:度)?[^。；，\n>]{0,12}候補
+        |
         usable\s+candidate
         |
         readable\s+crop
@@ -158,6 +184,8 @@ USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
         |
         无法稳定|不可独立解释|质量门|reject_visual_quality
         |
+        混入|汚染|隣接|切れ|途切れ|欠落|欠けて|不完全|単独では解釈できない|品質ゲート
+        |
         partial|subpanel|contaminat|truncat|incomplete|missing
         |
         caption\s*(?:missing|cut|truncated)
@@ -169,13 +197,13 @@ USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
 USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
     r"""
     (?:
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|工具|copy)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|工具|copy|コピー|書き込み|権限|ツール)
         [^。；\n]{0,40}
-        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        (?:失败|不足|拒绝|denied|blocked|error|报错|失敗|拒否|エラー)
         |
-        (?:失败|不足|拒绝|denied|blocked|error|报错)
+        (?:失败|不足|拒绝|denied|blocked|error|报错|失敗|拒否|エラー)
         [^。；\n]{0,40}
-        (?:materialize|物化|复制|拷贝|写入|权限|permission|copy)
+        (?:materialize|物化|复制|拷贝|写入|权限|permission|copy|コピー|書き込み|権限)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -184,13 +212,13 @@ USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
 MISSING_ASSET_MATERIALIZATION_RE = re.compile(
     r"""
     (?:
-        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing|候補が(?:ない|見つからない)|アセット(?:が)?(?:欠落|なし))
         [^。；\n]{0,50}
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked|コピー|書き込み|権限)
         |
-        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked|コピー|書き込み|権限)
         [^。；\n]{0,50}
-        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing)
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing|候補が(?:ない|見つからない)|アセット(?:が)?(?:欠落|なし))
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -211,6 +239,18 @@ ENGLISH_CJK_MATH_LABEL_RE = re.compile(
     r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
 )
 ENGLISH_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$")
+# 漢字（zh-CN / ja 共通）と仮名（ja）。混在言語判定と文中改行判定で使う。
+TARGET_SCRIPT_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+# \u65e5\u672c\u8a9e\u306e\u5e38\u7528\u6f22\u5b57\u30fb\u65b0\u5b57\u4f53\u306b\u306f\u73fe\u308c\u306a\u3044\u7c21\u4f53\u5b57\u3002ja \u30d7\u30ed\u30d5\u30a1\u30a4\u30eb\u3067
+# \u4e2d\u56fd\u8a9e\u30c6\u30f3\u30d7\u30ec\u30fc\u30c8\u306e\u898b\u51fa\u3057\u30fb\u30e9\u30d9\u30eb\uff08\u673a\u5236\u6d41\u7a0b / \u5efa\u8bae\u4f4d\u7f6e \u306a\u3069\uff09\u306e\u6b8b\u5b58\u3092\u691c\u51fa\u3059\u308b\u3002
+# \u65e5\u672c\u8a9e\u3067\u3082\u4f7f\u3046\u5b57\uff08\u6570\u30fb\u636e\u30fb\u540e\u30fb\u6ca1\u30fb\u91cc\u30fb\u4e0e\u30fb\u4f1a\u30fb\u533a\u30fb\u53cc\u30fb\u968f\u30fb\u51c6 \u306a\u3069\uff09\u306f\u610f\u56f3\u7684\u306b\u542b\u3081\u306a\u3044\u3002
+SIMPLIFIED_CHINESE_ONLY_CHARS = (
+    "\u4eec\u8fd9\u4e2a\u4e3a\u4ece\u8bf4\u65f6\u673a\u5173\u952e\u7ed3\u8bba\u56fe\u5e94\u8be5\u8fdb\u663e\u5b9e\u73b0\u8ba4\u8bc6\u8ba9\u8fd8\u8fc7\u6837\u79cd\u4e49\u672f\u573a\u8bad\u7ec3\u8bd5\u9a8c\u8bc4\u6d4b\u6784\u9636"
+    "\u8f93\u6001\u52a8\u52a1\u5904\u5907\u7ea7\u7c7b\u7ec4\u7ec7\u7edc\u7f51\u7ebf\u7f16\u8bd1\u5bfc\u603b\u8fbe\u53d1\u957f\u95e8\u95ee\u9898\u4f18\u52bf\u9009\u62e9\u9519\u8bef\u786e\u590d\u6742\u7b80\u5355\u5c42\u91ca\u8ba1\u8bbe"
+    "\u6743\u9884\u68c0\u62a5\u8865\u635f\u6807\u9891\u89c6\u89c9\u8bed\u8bcd\u6c47\u5e93\u522b\u7f13\u5757\u89c4\u73af\u7edf\u4f20\u53d8\u6362\u8f6c\u8f7d\u8f6e\u8f66\u9875\u7efc\u4e60\u5bf9\u8bf7\u8c22\u4e48\u5417\u5462\u5427\u5f88"
+    "\u8bae\u7b5b\u7eb3"
+)
+SIMPLIFIED_CHINESE_ONLY_RE = re.compile(f"[{''.join(sorted(set(SIMPLIFIED_CHINESE_ONLY_CHARS)))}]")
 
 RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
     re.compile(
@@ -253,7 +293,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--plan-file", default="", help="Optional note_plan JSON path. Defaults to sibling <note>.plan.json.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument("--language", default="", help="Run Override for output language: en, zh-CN, or ja.")
     return p
 
 
@@ -369,8 +409,13 @@ def front_matter_order_warnings(text: str) -> list[str]:
     return warnings
 
 
+STRICT_TOP_LEVEL_PROFILE_LANGUAGES = {"en", "ja"}
+# 中国語プロファイル向けの機械翻訳痕跡パターンは日本語には適用しない
+MECHANICAL_TRANSLATION_CHECK_LANGUAGES = {"zh-CN"}
+
+
 def english_top_level_section_warnings(text: str) -> list[str]:
-    if ACTIVE_LANGUAGE != "en":
+    if ACTIVE_LANGUAGE not in STRICT_TOP_LEVEL_PROFILE_LANGUAGES:
         return []
     actual = re.findall(r"^##\s+(.+?)\s*$", text, flags=re.MULTILINE)
     return [] if actual == list(REQUIRED_SECTIONS) else ["top_level_section_profile_invalid"]
@@ -421,6 +466,13 @@ METHOD_PAPER_SIGNAL_KEYWORDS = [
     "model",
     "system",
     "module",
+    # ja
+    "モデル",
+    "フレームワーク",
+    "システム",
+    "モジュール",
+    "エンコーダ",
+    "デコーダ",
 ]
 
 MECHANISM_IO_TOKENS = [
@@ -434,6 +486,11 @@ MECHANISM_IO_TOKENS = [
     "output",
     "produces",
     "returns",
+    # ja
+    "入力",
+    "出力",
+    "渡す",
+    "得る",
 ]
 
 MECHANISM_ACTION_TOKENS = [
@@ -456,6 +513,16 @@ MECHANISM_ACTION_TOKENS = [
     "decode",
     "update",
     "aggregate",
+    # ja
+    "整列",
+    "圧縮",
+    "投影",
+    "抽出",
+    "符号化",
+    "復号",
+    "連結",
+    "更新",
+    "集約",
 ]
 
 
@@ -501,6 +568,13 @@ PLACEHOLDER_ONLY_PATTERNS = [
     r"^参见原论文[。.!！]*$",
     r"^这里记录.*[。.!！]*$",
     r"^本节记录.*[。.!！]*$",
+    # ja
+    r"^未記入[。.!！]*$",
+    r"^後で追記[。.!！]*$",
+    r"^なし[。.!！]*$",
+    r"^省略[。.!！]*$",
+    r"^原論文を参照[。.!！]*$",
+    r"^ここに.*を記録.*[。.!！]*$",
 ]
 
 GENERIC_INNOVATION_PATTERNS = [
@@ -508,6 +582,10 @@ GENERIC_INNOVATION_PATTERNS = [
     r"具有创新性",
     r"novel approach",
     r"首次实现",
+    # ja
+    r"新しい手法を提案(?:する|した)?",
+    r"新規性が(?:ある|高い)",
+    r"初めて実現(?:した)?",
 ]
 
 GENERIC_KEY_RESULT_PATTERNS = [
@@ -515,6 +593,11 @@ GENERIC_KEY_RESULT_PATTERNS = [
     r"结果表明.*有效",
     r"取得(?:了)?较好效果",
     r"性能.*优越",
+    # ja
+    r"実験結果.*手法.*有効",
+    r"結果.*有効(?:である|だ)",
+    r"良好な(?:結果|効果|性能)",
+    r"性能.*優(?:れ|位|越)",
 ]
 
 GENERIC_LIMITATION_PATTERNS = [
@@ -523,11 +606,27 @@ GENERIC_LIMITATION_PATTERNS = [
     r"future work can",
     r"more data",
     r"后续.*扩展",
+    # ja
+    r"今後の(?:課題|研究).*データ",
+    r"(?:さらなる|より多くの)データが必要",
+    r"今後.*拡張",
 ]
 
-HONEST_MISSING_TOKENS = ("本文未给出", "论文未给出", "未报告", "没有报告", "未提供")
-HONEST_MISSING_BASIS_TOKENS = ("依据", "正文", "附录", "表格", "coverage", "作者")
-HONEST_MISSING_IMPACT_TOKENS = ("影响", "限制", "受限", "不能", "无法", "结论强度")
+HONEST_MISSING_TOKENS = (
+    "本文未给出", "论文未给出", "未报告", "没有报告", "未提供",
+    # ja
+    "報告されていない", "未報告", "未提供", "示されていない", "記載がない",
+)
+HONEST_MISSING_BASIS_TOKENS = (
+    "依据", "正文", "附录", "表格", "coverage", "作者",
+    # ja
+    "根拠", "本文", "付録", "表",
+)
+HONEST_MISSING_IMPACT_TOKENS = (
+    "影响", "限制", "受限", "不能", "无法", "结论强度",
+    # ja
+    "影響", "制限", "制約", "できない", "不可能", "結論の強さ",
+)
 
 DOUBLE_ESCAPED_TEX_COMMANDS = {
     "alpha",
@@ -604,6 +703,29 @@ def subsection_name_for_line(lines: list[str], line_index: int) -> str:
     return current_subsection
 
 
+def simplified_chinese_leftover_issue(
+    lines: list[str], idx: int, stripped: str
+) -> dict[str, object] | None:
+    """日本語ノートに簡体字中国語の見出し・ラベル・本文が残っていれば問題として返す。
+
+    漢字は日中で共有されるため、日本語では使われない簡体字（機→机、図→图 など）
+    だけを手がかりにする。基本情報と参考文献の原語メタデータ、URL、インラインコード、
+    リンクは対象外。
+    """
+    section_name = section_name_for_line(lines, idx - 1)
+    checked = stripped
+    if section_name in {section("core_information"), section("references")}:
+        for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
+            checked = pattern.sub("", checked)
+    if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
+        checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
+    checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
+    checked = HTTP_URL_RE.sub("", checked)
+    if not SIMPLIFIED_CHINESE_ONLY_RE.search(checked):
+        return None
+    return {"line_number": idx, "line": stripped, "reason": "simplified_chinese_text_present"}
+
+
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
@@ -638,13 +760,18 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
             if re.search(r"[\u4e00-\u9fff]", checked):
                 issues.append({"line_number": idx, "line": stripped, "reason": "non_english_text_present"})
             continue
+        if ACTIVE_LANGUAGE == "ja" and idx not in fenced_code_lines:
+            simplified_issue = simplified_chinese_leftover_issue(lines, idx, stripped)
+            if simplified_issue:
+                issues.append(simplified_issue)
+                continue
         if is_exempt_line(line):
             continue
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
         if section_name in {section("core_information"), section("references")}:
             continue
-        if not re.search(r"[\u4e00-\u9fff]", stripped):
+        if not TARGET_SCRIPT_RE.search(stripped):
             continue
         english_words = re.findall(r"\b[A-Za-z][A-Za-z0-9.-]*\b", stripped)
         if len(english_words) < 4:
@@ -664,7 +791,7 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
 
 
 def mechanical_translation_artifact_issues(text: str) -> list[dict[str, object]]:
-    if ACTIVE_LANGUAGE == "en":
+    if ACTIVE_LANGUAGE not in MECHANICAL_TRANSLATION_CHECK_LANGUAGES:
         return []
     issues: list[dict[str, object]] = []
     for idx, line in enumerate(text.splitlines(), start=1):
@@ -1099,9 +1226,9 @@ def suspicious_mid_sentence_linebreaks(text: str) -> list[dict[str, object]]:
         if re.search(r"[。！？.!?：:]$", current):
             continue
         if not re.search(r"[，,；;、）)\]」』]$", current):
-            if not re.search(r"[A-Za-z0-9`\u4e00-\u9fff]$", current):
+            if not re.search(r"[A-Za-z0-9`\u3040-\u30ff\u4e00-\u9fff]$", current):
                 continue
-        if not re.match(r"^[A-Za-z0-9`\u4e00-\u9fff(（“‘\"]", nxt):
+        if not re.match(r"^[A-Za-z0-9`\u3040-\u30ff\u4e00-\u9fff(（“‘\"]", nxt):
             continue
         issues.append(
             {
@@ -1479,7 +1606,7 @@ def meaningful_units(body: str, generic_patterns: list[str] | None = None) -> li
 
 
 def has_number_token(text: str) -> bool:
-    return bool(re.search(r"\d+(?:\.\d+)?\s*(?:%|％|[A-Za-z\u4e00-\u9fff]{0,8})", text))
+    return bool(re.search(r"\d+(?:\.\d+)?\s*(?:%|％|[A-Za-z\u3040-\u30ff\u4e00-\u9fff]{0,8})", text))
 
 
 def is_honest_missing_declaration(text: str) -> bool:

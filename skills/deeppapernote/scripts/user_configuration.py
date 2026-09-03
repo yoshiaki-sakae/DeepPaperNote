@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
-OUTPUT_LANGUAGES = {"zh-CN", "en"}
+OUTPUT_LANGUAGES = {"zh-CN", "en", "ja"}
 SAVE_MODES = {"workspace", "obsidian"}
 KNOWN_FIELDS = ("output_language", "save_mode", "obsidian_vault", "papers_dir")
 ALWAYS_REQUIRED = ("output_language", "save_mode")
@@ -136,7 +136,7 @@ def _validate(configuration: Mapping[str, Any]) -> tuple[list[dict[str, str]], l
     language = str(configuration.get("output_language", "")).strip()
     save_mode = str(configuration.get("save_mode", "")).strip()
     if language and language not in OUTPUT_LANGUAGES:
-        issues.append(_issue("output_language", "invalid_enum", "Expected zh-CN or en."))
+        issues.append(_issue("output_language", "invalid_enum", "Expected zh-CN, en, or ja."))
     if save_mode and save_mode not in SAVE_MODES:
         issues.append(_issue("save_mode", "invalid_enum", "Expected workspace or obsidian."))
     if save_mode == "obsidian":

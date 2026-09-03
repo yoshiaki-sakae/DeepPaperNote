@@ -1,6 +1,6 @@
 ---
 name: deeppapernote
-description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders.
+description: Generate a high-quality deep-reading note for a single paper and write it into an Obsidian-style vault. Use when the user gives a paper title, DOI, URL, arXiv ID, Zotero item, or local PDF and wants a polished Markdown note with strong structure, evidence-based analysis, and figure placeholders. Output language follows configuration (zh-CN, en, or ja). Japanese trigger phrases 「この論文の精読ノートを作って」「この論文をObsidianノートにまとめて」「論文を読んで日本語のMarkdownノートにして」.
 ---
 
 # DeepPaperNote
@@ -20,6 +20,11 @@ English trigger examples:
 - `Generate a deep-reading note for this paper`
 - `Turn this paper into an Obsidian research note`
 
+Japanese trigger examples:
+- `この論文の精読ノートを作って`
+- `この論文をObsidianノートにまとめて`
+- `この論文を読んで日本語のMarkdownノートにして`
+
 ## User Configuration
 
 Before a normal paper run, read `references/user-configuration.md` for configuration admission, migration, repair, Run Overrides, and Preference Changes.
@@ -28,7 +33,7 @@ Resolve Run Overrides from the explicit request, CLI, and current process enviro
 
 ## Language Integrity Contract
 
-After Configuration Readiness, resolve one `output_language` (`zh-CN` or `en`) for the run. `source_manifest.language_hint` describes source text only and never selects the note profile.
+After Configuration Readiness, resolve one `output_language` (`zh-CN`, `en`, or `ja`) for the run. `source_manifest.language_hint` describes source text only and never selects the note profile.
 
 Bind that exact value through Save Target Admission → Figure Plan → Figure/Table Decisions → Synthesis Bundle → Note Plan → Grounding Lint → Final Note Lint → Final Quality Review → Final Readability Review → Formal Save:
 
@@ -136,7 +141,7 @@ Non-negotiable rules:
 - fail-closed: if a usable PDF or sufficient evidence cannot be obtained after supported acquisition paths, stop and ask for better source material rather than producing a finished degraded note
 - model-first: scripts structure evidence, but the model must decide emphasis, contribution, mechanism, limitations, and final prose in the configured language
 - required structure: include the localized canonical sections in the order declared by `writing_contract.must_include_sections`
-- abstract fidelity: preserve the original abstract's meaning without adding later evidence or model judgments; translate it in `zh-CN` mode and render it faithfully in English in `en` mode
+- abstract fidelity: preserve the original abstract's meaning without adding later evidence or model judgments; translate it in `zh-CN` and `ja` modes and render it faithfully in English in `en` mode
 - mechanism depth: method, framework, and system papers should include the localized mechanism-flow subsection under the localized method section, normally as a 3 to 4 step numbered flow with input, operation, and output destination
 - placeholder-first figures: plan major figure/table placeholders first; replace one only when identity match and visual usability are both strong; otherwise keep the placeholder
 
@@ -193,7 +198,7 @@ Formal Save states:
 - After the synthesis bundle is built, complete the model-led Visual Review Gate and Figure/Table Decision Freeze before creating `note_plan`; no `review_pending` item may cross that boundary.
 - Pass the grounding and final-note figure gates before advancing; revise any failed decision coverage, insertion, structure, or status check.
 - An `insert` decision is complete only after Formal Save materializes the selected image into the paper-local `images/` directory and the write succeeds.
-- The note must pass the style gate for its configured language: `zh-CN` rejects mixed Chinese-English prose artifacts, while `en` rejects Chinese prose outside citation metadata.
+- The note must pass the style gate for its configured language: `zh-CN` rejects mixed Chinese-English prose artifacts, `en` rejects Chinese prose outside citation metadata, and `ja` rejects simplified-Chinese leftovers and mixed Japanese-English prose outside citation metadata.
 - The style gate also rejects mechanical term-replacement artifacts such as `KV缓存 of`, `批量ing`, `In相关 Researcher`, or `Single 序列 generation`; rewrite the sentence naturally instead of preserving a partially translated phrase.
 - Style gate enforcement: when `lint_note.py` output contains `passes_style_gate: false`, fix the reported issues and re-run lint. Keep fixing and re-running until lint passes — multiple rounds are normal and expected. Do not decide that any failure is an acceptable exception — proper nouns, math formulas, and citation metadata are not automatic exemptions. Only escalate to the user if the same failures appear unchanged across multiple rounds with no reduction, indicating the model is unable to make further progress independently.
 - If PDF or evidence quality is insufficient for a real deep note, fail closed: stop, report the blocked stage, and ask for the better PDF, OCR/source material, or other input needed to continue.

@@ -8,8 +8,12 @@ from copy import deepcopy
 from typing import Any
 
 DEFAULT_OUTPUT_LANGUAGE = "zh-CN"
-SUPPORTED_OUTPUT_LANGUAGES = ("zh-CN", "en")
-_ALIASES = {"zh": "zh-CN", "zh-cn": "zh-CN", "zh_cn": "zh-CN", "chinese": "zh-CN", "en": "en", "en-us": "en", "en_us": "en", "english": "en"}
+SUPPORTED_OUTPUT_LANGUAGES = ("zh-CN", "en", "ja")
+_ALIASES = {
+    "zh": "zh-CN", "zh-cn": "zh-CN", "zh_cn": "zh-CN", "chinese": "zh-CN",
+    "en": "en", "en-us": "en", "en_us": "en", "english": "en",
+    "ja": "ja", "ja-jp": "ja", "ja_jp": "ja", "japanese": "ja", "日本語": "ja",
+}
 _SCHEMAS: dict[str, dict[str, Any]] = {
     "zh-CN": {
         "sections": {"core_information": "核心信息", "abstract": "原文摘要翻译", "contributions": "创新点", "one_sentence_summary": "一句话总结", "research_questions": "研究问题", "data_and_task": "数据与任务定义", "method": "方法主线", "key_results": "关键结果", "deep_analysis": "深度分析", "limitations": "局限", "my_notes": "我的笔记", "references": "引用"},
@@ -24,6 +28,22 @@ _SCHEMAS: dict[str, dict[str, Any]] = {
         "core_info_aliases": {},
         "figure_labels": {"location": "Suggested location:", "reason": "Why it matters:", "status": "Current status:", "original_caption": "Original paper item:"},
         "mechanism_flow": "Mechanism Flow",
+        "abstract_contract": {
+            "source": "source_abstract",
+            "requirement": "faithful_rendering_in_output_language",
+            "forbidden_additions": [
+                "later_contribution_claims",
+                "later_result_interpretation",
+                "hindsight_judgment",
+            ],
+        },
+    },
+    "ja": {
+        "sections": {"core_information": "基本情報", "abstract": "要旨の翻訳", "contributions": "新規性", "one_sentence_summary": "一言まとめ", "research_questions": "研究課題", "data_and_task": "データとタスク定義", "method": "手法の骨子", "key_results": "主要な結果", "deep_analysis": "深掘り分析", "limitations": "限界", "my_notes": "私のメモ", "references": "参考文献"},
+        "core_info_fields": ("タイトル", "タイトル訳", "著者", "所属", "発表時期", "発表媒体", "DOI", "arXiv", "論文リンク", "コード / プロジェクト", "データ / リソース", "論文タイプ"),
+        "core_info_aliases": {},
+        "figure_labels": {"location": "推奨位置：", "reason": "配置理由：", "status": "現在の状態：", "original_caption": "論文原図番号："},
+        "mechanism_flow": "機構フロー",
         "abstract_contract": {
             "source": "source_abstract",
             "requirement": "faithful_rendering_in_output_language",

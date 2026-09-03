@@ -18,9 +18,11 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from user_configuration import (
+    OUTPUT_LANGUAGES,
     inspect_configuration,
     resolve_preferences,
     resolve_run_overrides,
+    user_config_path,
 )
 
 ARXIV_NS = {
@@ -2955,11 +2957,27 @@ def _normalize_domain_rules(
     return normalized
 
 
+def resolve_domain_rules_path() -> Path:
+    """Pick the domain taxonomy file: env override, then the user config directory, then the skill default.
+
+    The skill ships Chinese folder labels; a user whose Vault uses another language
+    keeps a translated copy outside the skill so upstream updates never overwrite it.
+    """
+    override = os.environ.get("DEEPPAPERNOTE_DOMAIN_RULES", "").strip()
+    if override:
+        return Path(override).expanduser()
+    user_rules = user_config_path().parent / "domain_rules.yaml"
+    if user_rules.is_file():
+        return user_rules
+    return DOMAIN_RULES_PATH
+
+
 def load_domain_rules() -> dict[str, list[dict[str, Any]]]:
     try:
-        if not DOMAIN_RULES_PATH.exists():
+        rules_path = resolve_domain_rules_path()
+        if not rules_path.exists():
             return _copy_default_domain_rules()
-        parsed = _parse_domain_rules_yaml(DOMAIN_RULES_PATH.read_text(encoding="utf-8-sig"))
+        parsed = _parse_domain_rules_yaml(rules_path.read_text(encoding="utf-8-sig"))
         normalized = _normalize_domain_rules(parsed)
         if normalized is None:
             return _copy_default_domain_rules()
@@ -3055,10 +3073,21 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
 
     paper_type, _ = infer_paper_type(title, abstract)
     if paper_type == "clinical_or_psychology_empirical":
-        return "医疗健康"
+        return _domain_label_by_alias(rules, "healthcare", "医疗健康")
     if paper_type == "AI_method":
-        return "机器学习"
-    return "未分类"
+        return _domain_label_by_alias(rules, "machine learning", "机器学习")
+    return _domain_label_by_alias(rules, "unclassified", "未分类")
+
+
+def _domain_label_by_alias(rules: dict[str, list[dict[str, Any]]], alias: str, default: str) -> str:
+    """Resolve a fallback folder label through the loaded taxonomy so translated rules stay in charge."""
+    wanted = _normalized_domain_label(alias)
+    for section in DOMAIN_SECTIONS:
+        for rule in rules[section]:
+            aliases = {_normalized_domain_label(item) for item in _as_string_list(rule.get("aliases"))}
+            if wanted in aliases:
+                return _domain_route_label(rule)
+    return default
 
 
 def is_probable_paper_folder(path: Path) -> bool:
@@ -3068,8 +3097,7 @@ def is_probable_paper_folder(path: Path) -> bool:
         (path / marker).exists()
         for marker in (
             f"{path.name}.md",
-            f"{path.name}.zh-CN.md",
-            f"{path.name}.en.md",
+            *(f"{path.name}.{language}.md" for language in sorted(OUTPUT_LANGUAGES)),
             ".deeppapernote.json",
         )
     )

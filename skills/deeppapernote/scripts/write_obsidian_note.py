@@ -108,7 +108,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--filename", default="", help="Explicit note filename.")
     p.add_argument("--asset-subdir", default="images", help="Asset folder name relative to the note directory.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
-    p.add_argument("--language", default="", help="Run Override for output language: en or zh-CN.")
+    p.add_argument("--language", default="", help="Run Override for output language: en, zh-CN, or ja.")
     p.add_argument(
         "--preflight",
         action="store_true",

@@ -48,21 +48,22 @@ The plan should state:
 - whether key formulas or complexity expressions need to appear in the final note
 
 Good note plans often add paper-specific sections such as:
-- `### データ構築`
-- `### 尺度の代理特徴抽出`
-- `### 訓練の詳細`
-- `### 重要な洞察`
-- `### なぜ結果が臨床応用可能性を意味しないか`
+- `### 数据构建`
+- `### 量表代理特征抽取`
+- `### 训练细节`
+- `### 关键洞察`
+- `### 为什么结果不等于临床可用`
 
 Recommended shape:
 
 ```json
 {
+  "output_language": "zh-CN",
   "paper_type": "AI_method",
   "paper_type_rationale": "The paper proposes a model mechanism and evaluates it against baselines; the script suggestion was treated only as a hint.",
   "dominant_domain": "machine learning",
-  "must_cover": ["データ構築", "手法の骨子", "主要なアブレーション"],
-  "key_numbers": ["主要結果が3.2ポイント向上", "訓練コストが40%削減"],
+  "must_cover": ["数据构建", "方法主线", "关键消融"],
+  "key_numbers": ["主结果提升 3.2 points", "训练成本降低 40%"],
   "real_comparisons": ["against the strongest reported baseline"],
   "central_claims": [
     {
@@ -80,9 +81,9 @@ Recommended shape:
   "followup_questions": ["Does the same state logging still help when external tools are slow, missing, or adversarially noisy?"],
   "section_plan": [
     {
-      "section": "手法の骨子",
+      "section": "方法主线",
       "weight": "high",
-      "subsections": ["機構フロー", "訓練目標"],
+      "subsections": ["机制流程", "训练目标"],
       "evidence_sources": [{"section_id": "sec:method"}, {"pages": [4, 6]}]
     }
   ]
@@ -102,8 +103,8 @@ Good final notes should:
 - add paper-specific subsections when the evidence supports them
 - avoid abstract-only rewriting
 - explain why a figure or table matters, not just attach it
-- separate “著者が何を主張しているか” from “論文が実際に何を証明しているか”
-- carry the plan's claim boundaries into `深掘り分析` and `限界`
+- separate “作者声称了什么” from “论文真正证明了什么”
+- carry the plan's claim boundaries into `深度分析` and `局限`
 - explain the mechanism deeply enough that an engineer could re-explain or re-implement the main flow
 
 ## Minimum Quality Bar

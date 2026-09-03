@@ -6,11 +6,8 @@ from __future__ import annotations
 import argparse
 import re
 
-from common import caption_preference_score, maybe_load_json_record, normalize_whitespace
-
-from locales import get_locale
-
-_LOCALE = get_locale()
+from common import caption_preference_score, maybe_load_json_record, normalize_whitespace, runtime_config
+from localization import normalize_output_language
 
 
 def parser() -> argparse.ArgumentParser:
@@ -20,6 +17,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--assets", default="", help="PDF assets JSON path or string.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
+    p.add_argument("--language", default="", help="Output language: en, zh-CN, or ja.")
     p.add_argument("--max-items", type=int, default=12, help="Maximum number of figure/table items to keep. 0 means keep all.")
     return p
 
@@ -38,7 +36,7 @@ def merge_inputs(primary: dict | None, evidence: dict | None, assets: dict | Non
     return merged
 
 
-def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
+def _classify_caption_kind_zh(item_id: str, caption: str) -> tuple[str, str, str]:
     text = f"{item_id} {caption}".lower()
     if any(
         token in text
@@ -69,7 +67,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
         r"(?:produces|achieves|outperforms|improves|reduces|increases)\b",
         text,
     ):
-        return "main_result", _LOCALE["SEC_KEY_RESULTS"], "この図または表は主要な結果を直接担っており、主要な結果セクションに配置するのが適切である。"
+        return "main_result", "关键结果", "这张图或表直接承载主结果，适合放在关键结果部分。"
     if any(
         token in text
         for token in [
@@ -83,7 +81,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "identification of studies",
         ]
     ):
-        return "data_or_task_overview", _LOCALE["SEC_DATA_TASK"], "この図は文献のスクリーニングや選定フローを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がレビューの証拠の出所を理解する助けにするのが適切である。"
+        return "data_or_task_overview", "数据与任务定义", "这张图解释文献筛选或纳入流程；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解综述证据来源。"
     if any(
         token in text
         for token in [
@@ -98,7 +96,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "process",
         ]
     ):
-        return "method_overview", _LOCALE["SUBSEC_MECHANISM"], "この図は手法全体またはシステムのフローを俯瞰している。マッチの信頼度が十分に高ければ、`### 機構フロー` に配置し、実行チェーンの理解を素早く構築する助けにするのが最適である。"
+        return "method_overview", "机制流程", "这张图概括了整体方法或系统流程；如果匹配置信度足够高，最适合放在 `### 机制流程` 帮助快速建立执行链理解。"
     if any(
         token in text
         for token in [
@@ -112,7 +110,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "issue",
         ]
     ):
-        return "data_or_task_overview", _LOCALE["SEC_DATA_TASK"], "この図はタスクやデータセットがどのように構築されるかを説明している。候補画像の品質が十分であれば、データとタスク定義セクションに配置し、読者がデータの出所を理解する助けにするのが適切である。"
+        return "data_or_task_overview", "数据与任务定义", "这张图解释任务或数据集如何被构造；如果候选图质量足够，适合放在数据与任务定义部分帮助读者理解数据来源。"
     if any(
         token in text
         for token in [
@@ -129,7 +127,7 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "attribute",
         ]
     ):
-        return "data_or_task", _LOCALE["SEC_DATA_TASK"], "この図はタスク設定やデータの説明に近く、データとタスク定義に配置するのが最も適切である。"
+        return "data_or_task", "数据与任务定义", "这张图更像任务设定或数据说明，放在数据与任务定义最合适。"
     if any(
         token in text
         for token in [
@@ -146,13 +144,49 @@ def classify_caption_kind(item_id: str, caption: str) -> tuple[str, str, str]:
             "block translation",
         ]
     ):
-        return "method_detail", _LOCALE["SEC_METHOD"], "この図は手法の内部機構や重要な実行状態を説明しており、手法の骨子セクションに機構詳細のプレースホルダとして配置するのが適切である。"
+        return "method_detail", "方法主线", "这张图解释方法内部机制或关键执行状态，适合放在方法主线部分作为机制细节占位。"
     if item_id.lower().startswith("table"):
-        return "table_result", _LOCALE["SEC_KEY_RESULTS"], "これは主要な結果を示す表であり、主要な結果セクションに配置して中心的な数値の把握を補助するのが適切である。"
-    return "supporting_figure", _LOCALE["SEC_DEEP_ANALYSIS"], "この図は補足図として適しており、深掘り分析セクションに配置して著者の主張の説明を助けるのが適切である。"
+        return "table_result", "关键结果", "这是关键结果表，适合放在关键结果部分辅助定位核心数值。"
+    return "supporting_figure", "深度分析", "这张图更适合作为补充图，放在深度分析部分帮助解释作者论点。"
 
 
-def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:
+ENGLISH_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
+    "main_result": ("Key Results", "This figure or table carries a primary result and belongs in Key Results."),
+    "data_or_task_overview": ("Data and Task Definition", "This visual explains the source, construction, screening, or scope of the data and task."),
+    "method_overview": ("Mechanism Flow", "This visual summarizes the method or system flow and belongs in Mechanism Flow when the match is reliable."),
+    "data_or_task": ("Data and Task Definition", "This visual clarifies the task setting, sample, or dataset."),
+    "method_detail": ("Method", "This visual explains an internal mechanism or execution state and belongs in Method."),
+    "table_result": ("Key Results", "This result table helps readers locate the central quantitative evidence."),
+    "supporting_figure": ("Deep Analysis", "This supporting visual helps explain the authors' argument in Deep Analysis."),
+}
+
+JAPANESE_FIGURE_PLACEMENT: dict[str, tuple[str, str]] = {
+    "main_result": ("主要な結果", "この図表は主結果を担っており、主要な結果に置くのが適切である。"),
+    "data_or_task_overview": ("データとタスク定義", "この図はデータとタスクの出所・構築・選別・範囲を説明する。"),
+    "method_overview": ("機構フロー", "この図は手法またはシステムの流れを要約しており、対応が確実なら機構フローに置く。"),
+    "data_or_task": ("データとタスク定義", "この図はタスク設定・サンプル・データセットを明確にする。"),
+    "method_detail": ("手法の骨子", "この図は内部機構や実行状態を説明しており、手法の骨子に置くのが適切である。"),
+    "table_result": ("主要な結果", "この結果表は読者が中心的な数値的証拠を見つける助けになる。"),
+    "supporting_figure": ("深掘り分析", "この補助図は深掘り分析で著者の論点を説明する助けになる。"),
+}
+
+LOCALIZED_FIGURE_PLACEMENT: dict[str, dict[str, tuple[str, str]]] = {
+    "en": ENGLISH_FIGURE_PLACEMENT,
+    "ja": JAPANESE_FIGURE_PLACEMENT,
+}
+
+
+def classify_caption_kind(item_id: str, caption: str, language: str | None = None) -> tuple[str, str, str]:
+    result = _classify_caption_kind_zh(item_id, caption)
+    placement = LOCALIZED_FIGURE_PLACEMENT.get(normalize_output_language(language))
+    if placement is None:
+        return result
+    kind = result[0]
+    section, reason = placement[kind]
+    return kind, section, reason
+
+
+def build_figure_items(evidence_pack: dict, *, limit: int = 12, language: str | None = None) -> list[dict]:
     raw_items = []
     for item in evidence_pack.get("figure_captions", []) or []:
         if isinstance(item, dict):
@@ -189,7 +223,7 @@ def build_figure_items(evidence_pack: dict, *, limit: int = 12) -> list[dict]:
         item = grouped[key]
         item_id = normalize_whitespace(str(item.get("id", "")))
         caption = normalize_whitespace(str(item.get("caption", "")))
-        kind, section, reason = classify_caption_kind(item_id, caption)
+        kind, section, reason = classify_caption_kind(item_id, caption, language)
         priority = 3
         if kind == "method_overview":
             priority = 1
@@ -493,12 +527,16 @@ def main() -> None:
     page_assets = data.get("page_assets", []) if isinstance(data.get("page_assets"), list) else []
     image_assets = data.get("image_assets", []) if isinstance(data.get("image_assets"), list) else []
     figure_assets = data.get("figure_assets", []) if isinstance(data.get("figure_assets"), list) else []
-    items = build_figure_items(evidence_pack, limit=args.max_items)
+    language = normalize_output_language(
+        runtime_config(cli_overrides={"output_language": args.language})["output_language"]
+    )
+    items = build_figure_items(evidence_pack, limit=args.max_items, language=language)
     items = attach_candidate_images(items, page_assets, image_assets, figure_assets)
     payload = {
         "status": "ok",
         "script": "plan_figures.py",
         "paper_id": args.paper_id or data.get("paper_id", ""),
+        "output_language": language,
         "figure_plan": {
             "paper_id": args.paper_id or data.get("paper_id", ""),
             "figures": items,

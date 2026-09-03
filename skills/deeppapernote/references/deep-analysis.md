@@ -1,10 +1,12 @@
 # Deep Analysis
 
+Language note: the analytical standard is language-independent. Draft in the configured output language; for `en`, use the exact headings and labels in `output-language.md`. Chinese-specific examples below apply only to `zh-CN`.
+
 Use this guide when the user wants a note that feels like a real research note rather than a cleaned-up summary.
 
 ## Goal
 
-Produce a Japanese paper note that helps future rereading answer:
+Produce a paper note in the configured language that helps future rereading answer:
 - this paper is really solving what problem
 - the core route or method chain is what
 - which evidence actually supports the claim
@@ -54,15 +56,15 @@ Use the synthesis bundle's paper-type contract and decide:
 
 - Write for future rereading, not for one-time display.
 - Prefer interpretation over translation.
-- Prefer “この論文が本当に価値のある点は…” over “本稿は…を提案した” style filler.
-- Avoid pasting long English sentences into Japanese sections.
+- Prefer “这篇论文真正有价值的点是...” over “本文提出了...” style filler.
+- Avoid pasting long English sentences into Chinese sections.
 - Do not fabricate metrics, ablations, or claims not supported by evidence.
 - When an individual claim has weak evidence within an otherwise sufficient Source Corpus, narrow the wording and state the claim boundary explicitly.
 - For method papers, write like a replication-minded researcher rather than a summary assistant.
 
 ## Section Guide
 
-### 基本情報
+### 核心信息
 
 Must include:
 - title
@@ -75,7 +77,7 @@ Must include:
 - code repo or project page when available
 - domain
 
-### 一言まとめ
+### 一句话总结
 
 Do not paraphrase the abstract.
 
@@ -83,14 +85,14 @@ Answer:
 - what the paper's real contribution is
 - what the title may overstate
 
-### 研究課題
+### 研究问题
 
 Answer:
 - the concrete pain point
 - why existing methods are not enough
 - whether this is a new problem, a new angle on an old problem, or a more realistic reformulation
 
-### データとタスク定義
+### 数据与任务定义
 
 Must separate:
 - where the data comes from
@@ -104,7 +106,7 @@ For clinical or social-science papers, spell out:
 - annotation or rating assumptions
 - whether the task is realistic or simplified
 
-### 手法の骨子
+### 方法主线
 
 This is usually where a shallow note fails.
 
@@ -120,19 +122,19 @@ Explain:
 - make the reader feel the Input -> key transformation -> Output flow, not just the paper's terminology
 
 For method, framework, or system papers:
-- default to an explicit `### 機構フロー` subsection inside `手法の骨子`
+- default to an explicit `### 机制流程` subsection inside `方法主线`
 - write it as a 3 to 4 step numbered list rather than a long paragraph
 - each step should say what goes in, what operation happens, and where the output goes next
-- if the paper has both training and inference details, use `### 機構フロー` for the dominant execution chain and leave training recipe details to neighboring subsections
+- if the paper has both training and inference details, use `### 机制流程` for the dominant execution chain and leave training recipe details to neighboring subsections
 
 For complex papers, use `###` subheadings such as:
-- `### 機構フロー`
-- `### データ構築`
-- `### 中間表現の抽出`
-- `### モデル構造`
-- `### 学習と推論`
+- `### 机制流程`
+- `### 数据构建`
+- `### 中间表征抽取`
+- `### 模型结构`
+- `### 训练与推理`
 
-### 主要な結果
+### 关键结果
 
 Do not dump all metrics.
 
@@ -148,7 +150,7 @@ For method papers, also ask:
 - if the paper reports ablations or removed-module comparisons, include at least one setting that hurt performance, made training unstable, or revealed a trade-off
 - if the evidence bundle contains no such negative ablation signal, say explicitly that the paper did not clearly report failed or unstable settings
 
-### 深掘り分析
+### 深度分析
 
 This is the most important part.
 
@@ -169,14 +171,14 @@ Use the plan's `central_claims` as the spine of this section:
 - when the paper has Discussion or Limitations, explain the mechanism behind those caveats rather than copying them as a list
 
 Good subsections often include:
-- `### 真の貢献は何か`
-- `### なぜ結果が成立するのか`
-- `### どこが誤読されやすいか`
-- `### 学習目標`
-- `### 推論とサンプリングの流れ`
-- `### 計算量と拡張性`
+- `### 真正贡献是什么`
+- `### 为什么结果成立`
+- `### 哪些地方容易被误读`
+- `### 训练目标`
+- `### 推理与采样链路`
+- `### 复杂度与扩展性`
 
-### 限界
+### 局限
 
 Write real limitations, not polite filler.
 
@@ -188,7 +190,7 @@ Prefer:
 - missing baselines
 - unrealistic task framing
 
-### 私のメモ
+### 我的笔记
 
 Seed future follow-up with prompts such as:
 - one reusable idea
@@ -201,7 +203,7 @@ Seed future follow-up with prompts such as:
 When the paper has useful visuals:
 - preserve placeholders for the important ones
 - prioritize one method figure, one data/task figure, and one result figure or table
-- if a high-confidence pipeline or architecture figure clearly matches the core execution chain, place it in `### 機構フロー` first
+- if a high-confidence pipeline or architecture figure clearly matches the core execution chain, place it in `### 机制流程` first
 - explain why each figure matters
 - keep original paper numbering such as `Fig. 1` or `Table 2`
 

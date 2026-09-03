@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -16,22 +17,71 @@ from contracts import (
     WRITING_CONTRACT_RULES,
     required_field_value_error,
 )
+from localization import (
+    normalize_output_language,
+    note_schema,
+    require_artifact_output_language,
+)
 
-from locales import get_locale
+ACTIVE_LANGUAGE = "zh-CN"
+SCHEMA: dict = {}
+SECTIONS: dict[str, str] = {}
+REQUIRED_SECTIONS: tuple[str, ...] = NOTE_REQUIRED_SECTIONS
+CORE_INFO_FIELDS: list[str] = []
+CORE_INFO_FIELD_INDEX: dict[str, int] = {}
+CORE_INFO_FIELD_ALIASES: dict[str, str] = {}
+FIGURE_TARGET_SECTIONS: set[str] = set()
+FIGURE_LABELS: dict[str, str] = {}
+MECHANISM_FLOW_HEADING = "机制流程"
 
-_LOCALE = get_locale()
+def configure_output_language(language: str | None = None) -> str:
+    global ACTIVE_LANGUAGE, SCHEMA, SECTIONS, REQUIRED_SECTIONS, CORE_INFO_FIELDS
+    global CORE_INFO_FIELD_INDEX, CORE_INFO_FIELD_ALIASES, FIGURE_TARGET_SECTIONS, FIGURE_LABELS, MECHANISM_FLOW_HEADING
+    ACTIVE_LANGUAGE = normalize_output_language(language)
+    SCHEMA = note_schema(ACTIVE_LANGUAGE)
+    SECTIONS = dict(SCHEMA["sections"])
+    REQUIRED_SECTIONS = tuple(SECTIONS.values())
+    CORE_INFO_FIELDS = list(SCHEMA["core_info_fields"])
+    CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
+    CORE_INFO_FIELD_ALIASES = dict(SCHEMA.get("core_info_aliases", {}))
+    FIGURE_TARGET_SECTIONS = {SECTIONS[key] for key in ("research_questions", "data_and_task", "method", "key_results", "deep_analysis", "limitations", "my_notes")}
+    FIGURE_LABELS = dict(SCHEMA["figure_labels"])
+    MECHANISM_FLOW_HEADING = str(SCHEMA["mechanism_flow"])
+    return ACTIVE_LANGUAGE
 
-REQUIRED_SECTIONS = NOTE_REQUIRED_SECTIONS
+def section(key: str) -> str:
+    return SECTIONS[key]
 
-CORE_INFO_FIELDS = _LOCALE["CORE_INFO_FIELDS"]
+def figure_prefix(key: str) -> str:
+    return f"> {FIGURE_LABELS[key]}"
 
-CORE_INFO_FIELD_INDEX = {field: idx for idx, field in enumerate(CORE_INFO_FIELDS)}
+configure_output_language()
 
-FIGURE_TARGET_SECTIONS = _LOCALE["FIGURE_TARGET_SECTIONS"]
+FIGURE_BUCKET_RESIDUE_TOKENS = {
+    "剩余",
+    "残余",
+    "未放置",
+    "未处理",
+    "待补",
+    # ja
+    "残り",
+    "未配置",
+    "未処理",
+    "補充待ち",
+}
 
-FIGURE_BUCKET_RESIDUE_TOKENS = _LOCALE["FIGURE_BUCKET_RESIDUE_TOKENS"]
-
-FIGURE_BUCKET_VISUAL_TOKENS = _LOCALE["FIGURE_BUCKET_VISUAL_TOKENS"]
+FIGURE_BUCKET_VISUAL_TOKENS = {
+    "图",
+    "表",
+    "图片",
+    "图表",
+    "占位",
+    # ja
+    "図",
+    "画像",
+    "図表",
+    "プレースホルダ",
+}
 
 ENGLISH_FIGURE_BUCKET_RESIDUE_TOKENS = {
     "remaining",
@@ -56,6 +106,10 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
     r"""(?ix)
     ^\s*
     (?:
+        \[\s*(?:图表|图片|图|表)\s*占位\s*\|[^\]]+\]
+        |
+        (?:图表|图片|图|表)\s*占位\s*[:：]\s*\S+
+        |
         \[\s*(?:図表|画像|図|表)\s*プレースホルダ\s*\|[^\]]+\]
         |
         (?:図表|画像|図|表)\s*プレースホルダ\s*[:：]\s*\S+
@@ -70,9 +124,13 @@ NONSTANDARD_FIGURE_PLACEHOLDER_RE = re.compile(
 REAL_IMAGE_STATUS_RE = re.compile(
     r"""
     (?:
-        (?:差し替え|挿入|コピー|複製|マテリアライズ|書き込み)\s*済み
+        已\s*(?:替换|插入|复制|拷贝|物化|写入)
         |
-        実画像\s*(?:に|として)\s*(?:差し替え|挿入)
+        (?:替换|插入)\s*为\s*真实图片
+        |
+        (?:置換|挿入|コピー|複製|書き込み|物化)\s*(?:済み|した|完了)
+        |
+        実(?:画像|図)(?:に|へ)\s*(?:置換|差し替え)
         |
         \b(?:inserted|replaced|copied|materialized)\b
     )
@@ -83,17 +141,25 @@ REAL_IMAGE_STATUS_RE = re.compile(
 USABLE_CANDIDATE_STATUS_RE = re.compile(
     r"""
     (?:
-        候補[^。；，\n>]{0,24}(?<!不)(?:使用可能|判読可能|鮮明)
+        候选[^。；，\n>]{0,24}(?<!不)(?:可用|可读|清晰)
         |
-        (?<!不)使用可能[^。；，\n>]{0,12}候補
+        (?<!不)可用[^。；，\n>]{0,12}候选
         |
-        (?:画像|表|図)?\s*トリミング[^。；，\n>]{0,12}(?<!不)(?:使用可能|判読可能|鮮明)
+        (?:图像|图片|表格|图|表)?\s*裁剪[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
         |
-        (?:画像|表|図)[^。；，\n>]{0,12}(?<!不)(?:使用可能|判読可能|鮮明)
+        (?:图像|图片|表格|图|表)[^。；，\n>]{0,12}(?<!不)(?:可用|可读|清晰)
         |
-        図番号\s*一致
+        图号\s*匹配
         |
-        一致度\s*高
+        匹配度\s*高
+        |
+        高\s*置信(?:度)?[^。；，\n>]{0,12}候选
+        |
+        候補[^。；，\n>]{0,24}(?<!不)(?:利用可能|使用可能|判読可能|鮮明)
+        |
+        (?:画像|図表|図|表)?\s*切り出し[^。；，\n>]{0,12}(?<!不)(?:利用可能|使用可能|判読可能|鮮明)
+        |
+        図番号\s*(?:が)?\s*一致
         |
         高\s*信頼(?:度)?[^。；，\n>]{0,12}候補
         |
@@ -103,7 +169,7 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
         |
         clear\s+crop
         |
-        high[-\s]*(?:confidence|match)
+        (?<!no\s)(?<!not\s)high[-\s]*(?:confidence|match)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -112,11 +178,13 @@ USABLE_CANDIDATE_STATUS_RE = re.compile(
 USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
     r"""
     (?:
-        混入|汚染|隣接|切り取り|切り詰め|切断|欠落|欠如|表本体が不完全|表本体の欠落|本文汚染
+        混入|污染|相邻|裁切|截断|切断|缺失|缺少|表体不完整|表格主体缺失|正文污染
         |
-        しか取得でき|局所(?:サブ図|パネル|切り出し|領域)|部分(?:サブ図|トリミング)
+        只拿到|局部(?:子图|面板|截图|区域)|部分(?:子图|裁剪)
         |
-        安定的に復元できない|独立して解釈できない|品質ゲート|reject_visual_quality
+        无法稳定|不可独立解释|质量门|reject_visual_quality
+        |
+        混入|汚染|隣接|切れ|途切れ|欠落|欠けて|不完全|単独では解釈できない|品質ゲート
         |
         partial|subpanel|contaminat|truncat|incomplete|missing
         |
@@ -129,13 +197,13 @@ USABLE_CANDIDATE_VISUAL_DEFECT_RE = re.compile(
 USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
     r"""
     (?:
-        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|ツール|copy)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|工具|copy|コピー|書き込み|権限|ツール)
         [^。；\n]{0,40}
-        (?:失敗|不足|拒否|denied|blocked|error|エラー)
+        (?:失败|不足|拒绝|denied|blocked|error|报错|失敗|拒否|エラー)
         |
-        (?:失敗|不足|拒否|denied|blocked|error|エラー)
+        (?:失败|不足|拒绝|denied|blocked|error|报错|失敗|拒否|エラー)
         [^。；\n]{0,40}
-        (?:materialize|マテリアライズ|コピー|複製|書き込み|権限|permission|copy)
+        (?:materialize|物化|复制|拷贝|写入|权限|permission|copy|コピー|書き込み|権限)
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -144,13 +212,13 @@ USABLE_CANDIDATE_MATERIALIZATION_BLOCKED_RE = re.compile(
 MISSING_ASSET_MATERIALIZATION_RE = re.compile(
     r"""
     (?:
-        (?:アセット欠落|見つからない|存在しない|欠如|asset_candidate_missing|candidate\s+missing)
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing|候補が(?:ない|見つからない)|アセット(?:が)?(?:欠落|なし))
         [^。；\n]{0,50}
-        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked|コピー|書き込み|権限)
         |
-        (?:materialize_figure_asset\.py|マテリアライズ|コピー|複製|書き込み|権限|permission|copy|blocked)
+        (?:materialize_figure_asset\.py|物化|复制|拷贝|写入|权限|permission|copy|blocked|コピー|書き込み|権限)
         [^。；\n]{0,50}
-        (?:アセット欠落|見つからない|存在しない|欠如|asset_candidate_missing|candidate\s+missing)
+        (?:资产缺失|未找到|没有|缺少|asset_candidate_missing|candidate\s+missing|候補が(?:ない|見つからない)|アセット(?:が)?(?:欠落|なし))
     )
     """,
     flags=re.IGNORECASE | re.VERBOSE,
@@ -159,6 +227,30 @@ MISSING_ASSET_MATERIALIZATION_RE = re.compile(
 MARKDOWN_IMAGE_EMBED_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 FIGURE_CALLOUT_TITLE_RE = re.compile(r"^>\s*\[!figure\][+-]?\s*(.*)$")
 HTTP_URL_RE = re.compile(r"https?://\S+")
+ENGLISH_METADATA_SOURCE_SPAN_PATTERNS = (
+    re.compile(r"`[^`\n]+`"),
+    re.compile(r"\[[^\]\n]+\]\([^)\n]+\)"),
+)
+ENGLISH_CJK_ENTITY_LINK_RE = re.compile(
+    r"\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\(https?://[^)\n]+\)"
+    r"|\[\[[^\]\n]*[\u4e00-\u9fff][^\]\n]*\]\]"
+)
+ENGLISH_CJK_MATH_LABEL_RE = re.compile(
+    r"\\operatorname\{(?:输入|输出|损失|状态|动作|奖励|标签|样本|预测|目标)\}"
+)
+ENGLISH_MATH_SPAN_RE = re.compile(r"\$\$[^$\n]+\$\$|\$[^$\n]+\$")
+# 漢字（zh-CN / ja 共通）と仮名（ja）。混在言語判定と文中改行判定で使う。
+TARGET_SCRIPT_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+# \u65e5\u672c\u8a9e\u306e\u5e38\u7528\u6f22\u5b57\u30fb\u65b0\u5b57\u4f53\u306b\u306f\u73fe\u308c\u306a\u3044\u7c21\u4f53\u5b57\u3002ja \u30d7\u30ed\u30d5\u30a1\u30a4\u30eb\u3067
+# \u4e2d\u56fd\u8a9e\u30c6\u30f3\u30d7\u30ec\u30fc\u30c8\u306e\u898b\u51fa\u3057\u30fb\u30e9\u30d9\u30eb\uff08\u673a\u5236\u6d41\u7a0b / \u5efa\u8bae\u4f4d\u7f6e \u306a\u3069\uff09\u306e\u6b8b\u5b58\u3092\u691c\u51fa\u3059\u308b\u3002
+# \u65e5\u672c\u8a9e\u3067\u3082\u4f7f\u3046\u5b57\uff08\u6570\u30fb\u636e\u30fb\u540e\u30fb\u6ca1\u30fb\u91cc\u30fb\u4e0e\u30fb\u4f1a\u30fb\u533a\u30fb\u53cc\u30fb\u968f\u30fb\u51c6 \u306a\u3069\uff09\u306f\u610f\u56f3\u7684\u306b\u542b\u3081\u306a\u3044\u3002
+SIMPLIFIED_CHINESE_ONLY_CHARS = (
+    "\u4eec\u8fd9\u4e2a\u4e3a\u4ece\u8bf4\u65f6\u673a\u5173\u952e\u7ed3\u8bba\u56fe\u5e94\u8be5\u8fdb\u663e\u5b9e\u73b0\u8ba4\u8bc6\u8ba9\u8fd8\u8fc7\u6837\u79cd\u4e49\u672f\u573a\u8bad\u7ec3\u8bd5\u9a8c\u8bc4\u6d4b\u6784\u9636"
+    "\u8f93\u6001\u52a8\u52a1\u5904\u5907\u7ea7\u7c7b\u7ec4\u7ec7\u7edc\u7f51\u7ebf\u7f16\u8bd1\u5bfc\u603b\u8fbe\u53d1\u957f\u95e8\u95ee\u9898\u4f18\u52bf\u9009\u62e9\u9519\u8bef\u786e\u590d\u6742\u7b80\u5355\u5c42\u91ca\u8ba1\u8bbe"
+    "\u6743\u9884\u68c0\u62a5\u8865\u635f\u6807\u9891\u89c6\u89c9\u8bed\u8bcd\u6c47\u5e93\u522b\u7f13\u5757\u89c4\u73af\u7edf\u4f20\u53d8\u6362\u8f6c\u8f7d\u8f6e\u8f66\u9875\u7efc\u4e60\u5bf9\u8bf7\u8c22\u4e48\u5417\u5462\u5427\u5f88"
+    "\u8bae\u7b5b\u7eb3"
+)
+SIMPLIFIED_CHINESE_ONLY_RE = re.compile(f"[{''.join(sorted(set(SIMPLIFIED_CHINESE_ONLY_CHARS)))}]")
 
 RUNTIME_ARTIFACT_REFERENCE_PATTERNS = [
     re.compile(
@@ -178,9 +270,9 @@ MECHANICAL_TRANSLATION_ARTIFACT_RE = re.compile(
     (?:
         [\u4e00-\u9fff]+(?:ing|ed|s)\b
         |
-        \b[A-Za-z]{2,}関連\b
+        \b[A-Za-z]{2,}相关\b
         |
-        [\u4e00-\u9fff](?:キャッシュ|ブロック)?\s+(?:of|with|for|on|in|from|and)\b
+        [\u4e00-\u9fff](?:缓存|块)?\s+(?:of|with|for|on|in|from|and)\b
         |
         \b(?:of|with|for|on|in|from|and)\s+[\u4e00-\u9fff]
         |
@@ -201,6 +293,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--plan-file", default="", help="Optional note_plan JSON path. Defaults to sibling <note>.plan.json.")
     p.add_argument("--output", default="", help="Output JSON path.")
     p.add_argument("--paper-id", default="", help="Canonical paper id.")
+    p.add_argument("--language", default="", help="Run Override for output language: en, zh-CN, or ja.")
     return p
 
 
@@ -210,7 +303,10 @@ def resolve_note_plan_path(note_path: Path, plan_file: str) -> Path:
     return note_path.with_suffix(".plan.json")
 
 
-def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
+def inspect_note_plan(
+    plan_path: Path,
+    output_language: str | None = None,
+) -> tuple[bool, list[str]]:
     if not plan_path.exists():
         return False, ["planning_artifact_missing"]
 
@@ -223,6 +319,14 @@ def inspect_note_plan(plan_path: Path) -> tuple[bool, list[str]]:
         return True, ["planning_required_fields_invalid"]
 
     issues: list[str] = []
+    try:
+        require_artifact_output_language(
+            plan,
+            "Note Plan",
+            output_language or ACTIVE_LANGUAGE,
+        )
+    except ValueError as exc:
+        issues.append(f"planning_output_language_contract_failed: {exc}")
     missing_fields = [field for field in NOTE_PLAN_REQUIRED_FIELDS if field not in plan]
     if missing_fields:
         issues.append("planning_required_fields_missing")
@@ -293,16 +397,28 @@ def find_missing_sections(text: str) -> list[str]:
 
 def front_matter_order_warnings(text: str) -> list[str]:
     warnings: list[str] = []
-    required_order = _LOCALE["FRONT_MATTER_REQUIRED_ORDER"]
+    required_order = [f"## {section('abstract')}", f"## {section('contributions')}", f"## {section('one_sentence_summary')}"]
     positions = []
-    for section in required_order:
-        idx = text.find(section)
+    for required_heading in required_order:
+        idx = text.find(required_heading)
         if idx < 0:
             return warnings
         positions.append(idx)
     if positions != sorted(positions):
         warnings.append("front_matter_order_invalid")
     return warnings
+
+
+STRICT_TOP_LEVEL_PROFILE_LANGUAGES = {"en", "ja"}
+# 中国語プロファイル向けの機械翻訳痕跡パターンは日本語には適用しない
+MECHANICAL_TRANSLATION_CHECK_LANGUAGES = {"zh-CN"}
+
+
+def english_top_level_section_warnings(text: str) -> list[str]:
+    if ACTIVE_LANGUAGE not in STRICT_TOP_LEVEL_PROFILE_LANGUAGES:
+        return []
+    actual = re.findall(r"^##\s+(.+?)\s*$", text, flags=re.MULTILINE)
+    return [] if actual == list(REQUIRED_SECTIONS) else ["top_level_section_profile_invalid"]
 
 
 def _inside_any_span(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
@@ -334,11 +450,80 @@ def inspect_reference_hygiene(text: str) -> list[dict[str, object]]:
     return issues
 
 
-METHOD_PAPER_SIGNAL_KEYWORDS = _LOCALE["METHOD_PAPER_SIGNAL_KEYWORDS"]
+METHOD_PAPER_SIGNAL_KEYWORDS = [
+    "模型",
+    "框架",
+    "系统",
+    "模块",
+    "编码器",
+    "解码器",
+    "预融合",
+    "attention",
+    "encoder",
+    "decoder",
+    "pipeline",
+    "framework",
+    "model",
+    "system",
+    "module",
+    # ja
+    "モデル",
+    "フレームワーク",
+    "システム",
+    "モジュール",
+    "エンコーダ",
+    "デコーダ",
+]
 
-MECHANISM_IO_TOKENS = _LOCALE["MECHANISM_IO_TOKENS"]
+MECHANISM_IO_TOKENS = [
+    "输入",
+    "输出",
+    "送入",
+    "送到",
+    "生成",
+    "得到",
+    "input",
+    "output",
+    "produces",
+    "returns",
+    # ja
+    "入力",
+    "出力",
+    "渡す",
+    "得る",
+]
 
-MECHANISM_ACTION_TOKENS = _LOCALE["MECHANISM_ACTION_TOKENS"]
+MECHANISM_ACTION_TOKENS = [
+    "融合",
+    "投影",
+    "压缩",
+    "对齐",
+    "池化",
+    "提取",
+    "编码",
+    "解码",
+    "拼接",
+    "查询",
+    "更新",
+    "align",
+    "compute",
+    "estimate",
+    "extract",
+    "encode",
+    "decode",
+    "update",
+    "aggregate",
+    # ja
+    "整列",
+    "圧縮",
+    "投影",
+    "抽出",
+    "符号化",
+    "復号",
+    "連結",
+    "更新",
+    "集約",
+]
 
 
 ENGLISH_FUNCTION_WORDS = {
@@ -375,17 +560,73 @@ ENGLISH_FUNCTION_WORDS = {
     "with",
 }
 
-PLACEHOLDER_ONLY_PATTERNS = _LOCALE["PLACEHOLDER_ONLY_PATTERNS"]
+PLACEHOLDER_ONLY_PATTERNS = [
+    r"^待补充[。.!！]*$",
+    r"^todo[。.!！]*$",
+    r"^暂无[。.!！]*$",
+    r"^略[。.!！]*$",
+    r"^参见原论文[。.!！]*$",
+    r"^这里记录.*[。.!！]*$",
+    r"^本节记录.*[。.!！]*$",
+    # ja
+    r"^未記入[。.!！]*$",
+    r"^後で追記[。.!！]*$",
+    r"^なし[。.!！]*$",
+    r"^省略[。.!！]*$",
+    r"^原論文を参照[。.!！]*$",
+    r"^ここに.*を記録.*[。.!！]*$",
+]
 
-GENERIC_INNOVATION_PATTERNS = _LOCALE["GENERIC_INNOVATION_PATTERNS"]
+GENERIC_INNOVATION_PATTERNS = [
+    r"本文提出(?:了)?一种新方法",
+    r"具有创新性",
+    r"novel approach",
+    r"首次实现",
+    # ja
+    r"新しい手法を提案(?:する|した)?",
+    r"新規性が(?:ある|高い)",
+    r"初めて実現(?:した)?",
+]
 
-GENERIC_KEY_RESULT_PATTERNS = _LOCALE["GENERIC_KEY_RESULT_PATTERNS"]
+GENERIC_KEY_RESULT_PATTERNS = [
+    r"实验结果表明方法有效",
+    r"结果表明.*有效",
+    r"取得(?:了)?较好效果",
+    r"性能.*优越",
+    # ja
+    r"実験結果.*手法.*有効",
+    r"結果.*有効(?:である|だ)",
+    r"良好な(?:結果|効果|性能)",
+    r"性能.*優(?:れ|位|越)",
+]
 
-GENERIC_LIMITATION_PATTERNS = _LOCALE["GENERIC_LIMITATION_PATTERNS"]
+GENERIC_LIMITATION_PATTERNS = [
+    r"未来工作.*更多数据",
+    r"需要更多数据",
+    r"future work can",
+    r"more data",
+    r"后续.*扩展",
+    # ja
+    r"今後の(?:課題|研究).*データ",
+    r"(?:さらなる|より多くの)データが必要",
+    r"今後.*拡張",
+]
 
-HONEST_MISSING_TOKENS = _LOCALE["HONEST_MISSING_TOKENS"]
-HONEST_MISSING_BASIS_TOKENS = _LOCALE["HONEST_MISSING_BASIS_TOKENS"]
-HONEST_MISSING_IMPACT_TOKENS = _LOCALE["HONEST_MISSING_IMPACT_TOKENS"]
+HONEST_MISSING_TOKENS = (
+    "本文未给出", "论文未给出", "未报告", "没有报告", "未提供",
+    # ja
+    "報告されていない", "未報告", "未提供", "示されていない", "記載がない",
+)
+HONEST_MISSING_BASIS_TOKENS = (
+    "依据", "正文", "附录", "表格", "coverage", "作者",
+    # ja
+    "根拠", "本文", "付録", "表",
+)
+HONEST_MISSING_IMPACT_TOKENS = (
+    "影响", "限制", "受限", "不能", "无法", "结论强度",
+    # ja
+    "影響", "制限", "制約", "できない", "不可能", "結論の強さ",
+)
 
 DOUBLE_ESCAPED_TEX_COMMANDS = {
     "alpha",
@@ -413,7 +654,7 @@ DOUBLE_ESCAPED_TEX_COMMANDS = {
 
 def is_metadata_line(line: str) -> bool:
     stripped = line.strip()
-    prefixes = [f"- {field}:" for field in CORE_INFO_FIELDS]
+    prefixes = [f"- {field}:" for field in (*CORE_INFO_FIELDS, *CORE_INFO_FIELD_ALIASES)]
     return any(stripped.startswith(prefix) for prefix in prefixes)
 
 
@@ -427,9 +668,9 @@ def is_exempt_line(line: str) -> bool:
         return True
     if (
         stripped.startswith("> [!figure]")
-        or stripped.startswith("> 推奨位置：")
-        or stripped.startswith("> 配置理由：")
-        or stripped.startswith("> 現在の状態：")
+        or stripped.startswith(figure_prefix("location"))
+        or stripped.startswith(figure_prefix("reason"))
+        or stripped.startswith(figure_prefix("status"))
     ):
         return True
     if re.search(r"https?://", stripped):
@@ -462,18 +703,75 @@ def subsection_name_for_line(lines: list[str], line_index: int) -> str:
     return current_subsection
 
 
+def simplified_chinese_leftover_issue(
+    lines: list[str], idx: int, stripped: str
+) -> dict[str, object] | None:
+    """日本語ノートに簡体字中国語の見出し・ラベル・本文が残っていれば問題として返す。
+
+    漢字は日中で共有されるため、日本語では使われない簡体字（機→机、図→图 など）
+    だけを手がかりにする。基本情報と参考文献の原語メタデータ、URL、インラインコード、
+    リンクは対象外。
+    """
+    section_name = section_name_for_line(lines, idx - 1)
+    checked = stripped
+    if section_name in {section("core_information"), section("references")}:
+        for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
+            checked = pattern.sub("", checked)
+    if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
+        checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
+    checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
+    checked = HTTP_URL_RE.sub("", checked)
+    if not SIMPLIFIED_CHINESE_ONLY_RE.search(checked):
+        return None
+    return {"line_number": idx, "line": stripped, "reason": "simplified_chinese_text_present"}
+
+
 def mixed_language_issues(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
     lines = text.splitlines()
+    fenced_code_lines: set[int] = set()
+    fence_start: int | None = None
+    for line_index, line in enumerate(lines, start=1):
+        if not line.strip().startswith("```"):
+            continue
+        if fence_start is None:
+            fence_start = line_index
+        else:
+            fenced_code_lines.update(range(fence_start, line_index + 1))
+            fence_start = None
     for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if ACTIVE_LANGUAGE == "en":
+            if idx in fenced_code_lines:
+                continue
+            checked = stripped
+            section_name = section_name_for_line(lines, idx - 1)
+            if section_name in {section("core_information"), section("references")}:
+                for pattern in ENGLISH_METADATA_SOURCE_SPAN_PATTERNS:
+                    checked = pattern.sub("", checked)
+            if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}"):
+                checked = ENGLISH_METADATA_SOURCE_SPAN_PATTERNS[0].sub("", checked)
+            checked = ENGLISH_CJK_ENTITY_LINK_RE.sub("", checked)
+            checked = ENGLISH_MATH_SPAN_RE.sub(
+                lambda match: ENGLISH_CJK_MATH_LABEL_RE.sub("", match.group(0)),
+                checked,
+            )
+            checked = HTTP_URL_RE.sub("", checked)
+            if re.search(r"[\u4e00-\u9fff]", checked):
+                issues.append({"line_number": idx, "line": stripped, "reason": "non_english_text_present"})
+            continue
+        if ACTIVE_LANGUAGE == "ja" and idx not in fenced_code_lines:
+            simplified_issue = simplified_chinese_leftover_issue(lines, idx, stripped)
+            if simplified_issue:
+                issues.append(simplified_issue)
+                continue
         if is_exempt_line(line):
             continue
-        stripped = line.strip()
         section_name = section_name_for_line(lines, idx - 1)
         subsection_name = subsection_name_for_line(lines, idx - 1)
-        if section_name in {_LOCALE["SEC_CORE_INFO"], _LOCALE["SEC_REFERENCES"]}:
+        if section_name in {section("core_information"), section("references")}:
             continue
-        if not re.search(r"[\u4e00-\u9fff]", stripped):
+        if not TARGET_SCRIPT_RE.search(stripped):
             continue
         english_words = re.findall(r"\b[A-Za-z][A-Za-z0-9.-]*\b", stripped)
         if len(english_words) < 4:
@@ -493,6 +791,8 @@ def mixed_language_issues(text: str) -> list[dict[str, object]]:
 
 
 def mechanical_translation_artifact_issues(text: str) -> list[dict[str, object]]:
+    if ACTIVE_LANGUAGE not in MECHANICAL_TRANSLATION_CHECK_LANGUAGES:
+        return []
     issues: list[dict[str, object]] = []
     for idx, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
@@ -535,11 +835,11 @@ def inspect_figure_callouts(text: str) -> list[str]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 推奨位置："):
+            if nxt.startswith(figure_prefix("location")):
                 has_location = True
-            if nxt.startswith("> 配置理由："):
+            if nxt.startswith(figure_prefix("reason")):
                 has_reason = True
-            if nxt.startswith("> 現在の状態："):
+            if nxt.startswith(figure_prefix("status")):
                 has_status = True
             j += 1
         if not has_location:
@@ -563,9 +863,10 @@ def figure_callout_title(line: str) -> str:
 
 def figure_status_text(line: str) -> str:
     stripped = line.strip()
-    if not stripped.startswith("> 現在の状態："):
+    prefix = figure_prefix("status")
+    if not stripped.startswith(prefix):
         return ""
-    return stripped.removeprefix("> 現在の状態：").strip()
+    return stripped.removeprefix(prefix).strip()
 
 
 def has_accepted_usable_placeholder_reason(status_text: str) -> bool:
@@ -663,8 +964,9 @@ def figure_callout_placement_issues(text: str) -> list[dict[str, object]]:
             nxt = lines[j].strip()
             if not nxt.startswith(">"):
                 break
-            if nxt.startswith("> 推奨位置："):
-                location = nxt.removeprefix("> 推奨位置：").strip()
+            prefix = figure_prefix("location")
+            if nxt.startswith(prefix):
+                location = nxt.removeprefix(prefix).strip()
                 break
             j += 1
 
@@ -834,14 +1136,15 @@ def figure_structure_passes(text: str) -> bool:
 
 
 def core_info_structure_issues(text: str) -> list[dict[str, object]]:
-    body = section_body(text, _LOCALE["SEC_CORE_INFO"])
+    core_heading = section("core_information")
+    body = section_body(text, core_heading)
     if not body:
         return []
 
     issues: list[dict[str, object]] = []
     seen_fields: set[str] = set()
     last_known_index = -1
-    base_line = _line_number_from_offset(text, text.find("## 基本情報"))
+    base_line = _line_number_from_offset(text, text.find(f"## {core_heading}"))
 
     for offset, raw_line in enumerate(body.splitlines(), start=1):
         stripped = raw_line.strip()
@@ -860,6 +1163,7 @@ def core_info_structure_issues(text: str) -> list[dict[str, object]]:
             continue
 
         field = match.group(1).strip()
+        field = CORE_INFO_FIELD_ALIASES.get(field, field)
         if field not in CORE_INFO_FIELD_INDEX:
             issues.append(
                 {
@@ -902,7 +1206,7 @@ def is_prose_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", "*論文原図番号")):
+    if stripped.startswith(("#", "-", "*", "> ", "```", "![[", f"*{FIGURE_LABELS['original_caption']}")):
         return False
     if stripped.startswith("`") and stripped.endswith("`"):
         return False
@@ -922,9 +1226,9 @@ def suspicious_mid_sentence_linebreaks(text: str) -> list[dict[str, object]]:
         if re.search(r"[。！？.!?：:]$", current):
             continue
         if not re.search(r"[，,；;、）)\]」』]$", current):
-            if not re.search(r"[A-Za-z0-9`\u4e00-\u9fff]$", current):
+            if not re.search(r"[A-Za-z0-9`\u3040-\u30ff\u4e00-\u9fff]$", current):
                 continue
-        if not re.match(r"^[A-Za-z0-9`\u4e00-\u9fff(（“‘\"]", nxt):
+        if not re.match(r"^[A-Za-z0-9`\u3040-\u30ff\u4e00-\u9fff(（“‘\"]", nxt):
             continue
         issues.append(
             {
@@ -1000,6 +1304,14 @@ def _strip_fenced_code_preserve_newlines(text: str) -> str:
 
 def _extract_math_blocks(text: str) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     sanitized = _strip_fenced_code_preserve_newlines(text)
+    if ACTIVE_LANGUAGE == "en":
+        # Currency amounts such as "$25 billion" are prose, not LaTeX delimiters.
+        sanitized = re.sub(
+            r"\$(?=\d+(?:\.\d+)?\s+(?:thousand|million|billion|trillion|dollars?|usd)\b)",
+            r"\$",
+            sanitized,
+            flags=re.IGNORECASE,
+        )
     blocks: list[dict[str, object]] = []
     issues: list[dict[str, object]] = []
     consumed_lines: set[int] = set()
@@ -1219,14 +1531,14 @@ def cleaned_section_lines(body: str) -> list[str]:
             continue
         if (
             stripped.startswith("> [!figure]")
-            or stripped.startswith("> 推奨位置：")
-            or stripped.startswith("> 配置理由：")
-            or stripped.startswith("> 現在の状態：")
+            or stripped.startswith(figure_prefix("location"))
+            or stripped.startswith(figure_prefix("reason"))
+            or stripped.startswith(figure_prefix("status"))
         ):
             continue
         if stripped.startswith("!["):
             continue
-        if stripped.startswith("*論文原図番号：") and stripped.endswith("*"):
+        if stripped.startswith(f"*{FIGURE_LABELS['original_caption']}") and stripped.endswith("*"):
             continue
         if stripped.startswith("> "):
             stripped = stripped[2:].strip()
@@ -1294,7 +1606,7 @@ def meaningful_units(body: str, generic_patterns: list[str] | None = None) -> li
 
 
 def has_number_token(text: str) -> bool:
-    return bool(re.search(r"\d+(?:\.\d+)?\s*(?:%|％|[A-Za-z\u4e00-\u9fff]{0,8})", text))
+    return bool(re.search(r"\d+(?:\.\d+)?\s*(?:%|％|[A-Za-z\u3040-\u30ff\u4e00-\u9fff]{0,8})", text))
 
 
 def is_honest_missing_declaration(text: str) -> bool:
@@ -1320,69 +1632,75 @@ def has_reference_entry(text: str) -> bool:
         return True
     if re.search(r"\b[A-Z][A-Za-z-]+ et al\.?\s*,?\s*(?:19|20)\d{2}\b", normalized):
         return True
-    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会議|論文誌|arXiv)", normalized):
+    if re.search(r"\b[A-Z][A-Za-z-]+(?:\s+(?:and|&|et al\.?|[A-Z][A-Za-z-]+))*\s*\((?:19|20)\d{2}\)", normalized):
+        return True
+    if re.search(r"(?:19|20)\d{2}.*(?:DOI|doi|会议|期刊|arXiv)", normalized):
         return True
     return False
 
 
 def inspect_substantive_content(text: str) -> list[dict[str, object]]:
     issues: list[dict[str, object]] = []
-    for section in REQUIRED_SECTIONS:
-        body = section_body(text, section)
+    for section_heading in REQUIRED_SECTIONS:
+        body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if is_placeholder_like(content):
-            issues.append(issue(section, "section_empty_shell", "error", content or section))
-        if section not in {_LOCALE["SEC_KEY_RESULTS"], _LOCALE["SEC_REFERENCES"]} and is_honest_missing_declaration(content):
-            issues.append(issue(section, "section_honest_missing_not_allowed", "error", content))
+            issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
+        if section_heading not in {section("key_results"), section("references")} and is_honest_missing_declaration(content):
+            issues.append(issue(section_heading, "section_honest_missing_not_allowed", "error", content))
 
-    innovation = section_body(text, _LOCALE["SEC_INNOVATION"])
+    contributions_heading = section("contributions")
+    innovation = section_body(text, contributions_heading)
     innovation_content = normalized_section_content(innovation)
     innovation_units = meaningful_units(innovation, GENERIC_INNOVATION_PATTERNS)
     if not innovation_units:
-        issues.append(issue(_LOCALE["SEC_INNOVATION"], "innovation_empty_shell", "error", innovation_content))
+        issues.append(issue(contributions_heading, "innovation_empty_shell", "error", innovation_content))
     elif len(innovation_units) < 2:
-        issues.append(issue(_LOCALE["SEC_INNOVATION"], "innovation_too_few_specific_points", "warning", innovation_content))
+        issues.append(issue(contributions_heading, "innovation_too_few_specific_points", "warning", innovation_content))
 
-    key_results = section_body(text, _LOCALE["SEC_KEY_RESULTS"])
+    key_results_heading = section("key_results")
+    key_results = section_body(text, key_results_heading)
     key_results_content = normalized_section_content(key_results)
     if is_honest_missing_declaration(key_results_content):
         issues.append(
             issue(
-                _LOCALE["SEC_KEY_RESULTS"],
+                key_results_heading,
                 "key_results_honest_missing_not_allowed",
                 "error",
                 key_results_content,
             )
         )
     elif not meaningful_units(key_results, GENERIC_KEY_RESULT_PATTERNS):
-        issues.append(issue(_LOCALE["SEC_KEY_RESULTS"], "key_results_empty_shell", "error", key_results_content))
+        issues.append(issue(key_results_heading, "key_results_empty_shell", "error", key_results_content))
     elif not has_number_token(key_results_content):
         issues.append(
             issue(
-                _LOCALE["SEC_KEY_RESULTS"],
+                key_results_heading,
                 "key_results_quantitative_result_missing",
                 "warning",
                 key_results_content,
             )
         )
 
-    references = section_body(text, _LOCALE["SEC_REFERENCES"])
+    references_heading = section("references")
+    references = section_body(text, references_heading)
     references_content = normalized_section_content(references)
     if is_honest_missing_declaration(references_content):
-        issues.append(issue(_LOCALE["SEC_REFERENCES"], "references_unavailable_declared", "warning", references_content))
+        issues.append(issue(references_heading, "references_unavailable_declared", "warning", references_content))
     elif is_placeholder_like(references_content) or not has_reference_entry(references_content):
-        issues.append(issue(_LOCALE["SEC_REFERENCES"], "references_placeholder", "error", references_content))
+        issues.append(issue(references_heading, "references_placeholder", "error", references_content))
 
-    limitations = section_body(text, _LOCALE["SEC_LIMITS"])
+    limitations_heading = section("limitations")
+    limitations = section_body(text, limitations_heading)
     limitations_content = normalized_section_content(limitations)
     if not meaningful_units(limitations, GENERIC_LIMITATION_PATTERNS):
-        issues.append(issue(_LOCALE["SEC_LIMITS"], "limitations_empty_shell", "error", limitations_content))
+        issues.append(issue(limitations_heading, "limitations_empty_shell", "error", limitations_content))
 
-    for section in (_LOCALE["SEC_METHOD"], _LOCALE["SEC_DEEP_ANALYSIS"]):
-        body = section_body(text, section)
+    for section_heading in (section("method"), section("deep_analysis")):
+        body = section_body(text, section_heading)
         content = normalized_section_content(body)
         if not meaningful_units(body):
-            issues.append(issue(section, "section_empty_shell", "error", content or section))
+            issues.append(issue(section_heading, "section_empty_shell", "error", content or section_heading))
 
     deduped: list[dict[str, object]] = []
     seen: set[tuple[str, str, str]] = set()
@@ -1396,7 +1714,7 @@ def inspect_substantive_content(text: str) -> list[dict[str, object]]:
 
 
 def method_section_requires_mechanism_flow(text: str) -> bool:
-    body = section_body(text, _LOCALE["SEC_METHOD"])
+    body = section_body(text, section("method"))
     if not body:
         return False
     lower = body.lower()
@@ -1407,13 +1725,19 @@ def method_section_requires_mechanism_flow(text: str) -> bool:
 
 def mechanism_flow_warnings(text: str) -> list[str]:
     warnings: list[str] = []
+    if ACTIVE_LANGUAGE == "en":
+        for heading in re.findall(r"^###\s+(.+?)\s*$", text, flags=re.MULTILINE):
+            if heading.casefold() == MECHANISM_FLOW_HEADING.casefold() and heading != MECHANISM_FLOW_HEADING:
+                warnings.append("mechanism_flow_heading_invalid")
+                break
     if not method_section_requires_mechanism_flow(text):
         return warnings
-    if f'### {_LOCALE["SUBSEC_MECHANISM"]}' not in text:
+    heading_pattern = rf"^###\s+{re.escape(MECHANISM_FLOW_HEADING)}\s*$"
+    if not re.search(heading_pattern, text, flags=re.MULTILINE):
         warnings.append("mechanism_flow_subsection_missing")
         return warnings
 
-    body = subsection_body(text, _LOCALE["SEC_METHOD"], _LOCALE["SUBSEC_MECHANISM"])
+    body = subsection_body(text, section("method"), MECHANISM_FLOW_HEADING)
     if not body:
         warnings.append("mechanism_flow_subsection_empty")
         return warnings
@@ -1423,8 +1747,9 @@ def mechanism_flow_warnings(text: str) -> list[str]:
         warnings.append("mechanism_flow_step_count_unexpected")
 
     step_text = " ".join(step_lines)
-    has_io_signal = any(token in step_text for token in MECHANISM_IO_TOKENS)
-    has_action_signal = any(token in step_text for token in MECHANISM_ACTION_TOKENS)
+    step_text_lower = step_text.lower()
+    has_io_signal = any(token.lower() in step_text_lower for token in MECHANISM_IO_TOKENS)
+    has_action_signal = any(token.lower() in step_text_lower for token in MECHANISM_ACTION_TOKENS)
     if not (has_io_signal and has_action_signal):
         warnings.append("mechanism_flow_too_abstract")
 
@@ -1441,9 +1766,11 @@ def strip_frontmatter(text: str) -> str:
 
 
 def main() -> None:
-    from common import emit
+    from common import emit, runtime_config
 
     args = parser().parse_args()
+    config = runtime_config(cli_overrides={"output_language": args.language})
+    output_language = configure_output_language(str(config["output_language"]))
     path = Path(args.input).expanduser().resolve()
     # utf-8-sig strips a leading BOM and the replace() normalizes CRLF so
     # Windows-authored notes are linted identically to LF/BOM-less notes;
@@ -1463,7 +1790,8 @@ def main() -> None:
     reference_hygiene_issues = inspect_reference_hygiene(text)
     substantive_issues = inspect_substantive_content(text)
     planning_artifact_found, planning_artifact_issues = inspect_note_plan(
-        resolve_note_plan_path(path, args.plan_file)
+        resolve_note_plan_path(path, args.plan_file),
+        output_language,
     )
     warnings.extend(inspect_figure_callouts(text))
     for issue in figure_issues:
@@ -1482,6 +1810,7 @@ def main() -> None:
         if reason and reason not in warnings:
             warnings.append(reason)
     warnings.extend(front_matter_order_warnings(text))
+    warnings.extend(english_top_level_section_warnings(text))
     warnings.extend(mechanism_flow_warnings(text))
     if not body_text.lstrip().startswith("# "):
         warnings.append("title_heading_missing")
@@ -1511,8 +1840,10 @@ def main() -> None:
     payload = {
         "status": "ok",
         "script": "lint_note.py",
+        "output_language": output_language,
         "paper_id": args.paper_id,
         "input_path": str(path),
+        "note_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "headers": headers,
         "missing_sections": missing_sections,
         "warnings": warnings,
@@ -1534,6 +1865,8 @@ def main() -> None:
                 "title_heading_missing",
                 "no_level2_sections",
                 "front_matter_order_invalid",
+                "top_level_section_profile_invalid",
+                "mechanism_flow_heading_invalid",
             }
             & set(warnings)
         ),

@@ -1,15 +1,13 @@
 # User-editable domain routing taxonomy.
 # Application domains are tried before fallback method domains.
-# label / route_to / specialized_folders は出力先フォルダ名（日本語）。
-# aliases / keywords は英語ソース本文との照合に使うため英語のまま残す。
 domains:
-  - label: 医療・健康
+  - label: 医疗健康
     aliases:
       - healthcare
       - medical
       - clinical medicine
     specialized_folders:
-      - メンタルヘルス
+      - 心理健康
     keywords:
       - clinical
       - patient
@@ -77,7 +75,7 @@ domains:
       - investment
     methods: []
 
-  - label: ロボティクス
+  - label: 机器人
     aliases:
       - robotics
       - robotic
@@ -94,7 +92,7 @@ domains:
     methods:
       - diffusion policy
 
-  - label: ソフトウェア工学
+  - label: 软件工程
     aliases:
       - software engineering
     keywords:
@@ -124,8 +122,8 @@ domains:
       - bioinformatics
     methods: []
 
-  - label: メンタルヘルス
-    route_to: 医療・健康
+  - label: 心理健康
+    route_to: 医疗健康
     aliases:
       - mental health
       - psychology
@@ -141,7 +139,7 @@ domains:
       - symptom
     methods: []
 
-  - label: 推薦システム
+  - label: 推荐系统
     aliases:
       - recommender systems
       - recommendation
@@ -154,7 +152,7 @@ domains:
     methods: []
 
 fallback_domains:
-  - label: 大規模言語モデル
+  - label: 大模型
     aliases:
       - llm
       - large language model
@@ -187,7 +185,7 @@ fallback_domains:
       - rlhf
     methods: []
 
-  - label: 機械学習
+  - label: 机器学习
     aliases:
       - machine learning
       - ml

@@ -17,6 +17,12 @@ from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from user_configuration import (
+    inspect_configuration,
+    resolve_preferences,
+    resolve_run_overrides,
+)
+
 ARXIV_NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "arxiv": "http://arxiv.org/schemas/atom",
@@ -1263,6 +1269,25 @@ def _is_unique_exact_zotero_title_observation(
     )
 
 
+def _is_unique_exact_arxiv_title_observation(
+    anchor: dict[str, Any],
+    item: dict[str, Any],
+    observation: dict[str, Any],
+) -> bool:
+    relation = item.get("relation")
+    if not isinstance(relation, dict):
+        return False
+    return bool(
+        _string_field(item, "provider").lower() == "arxiv"
+        and _string_field(relation, "kind") == "arxiv_lookup"
+        and _string_field(relation, "match_kind") == "title"
+        and _string_field(relation, "match_resolution") == "unique_exact"
+        and _record_arxiv_id(observation)
+        and normalize_identity_title(_string_field(anchor, "title"))
+        == normalize_identity_title(_string_field(observation, "title"))
+    )
+
+
 def adjudicate_identity_observations(
     anchor: dict[str, Any],
     observations: list[Any],
@@ -1334,6 +1359,11 @@ def adjudicate_identity_observations(
             item,
             observation,
         )
+        unique_exact_arxiv_title_match = _is_unique_exact_arxiv_title_observation(
+            anchor,
+            item,
+            observation,
+        )
         if not title_author_year_match and not shared_identifiers:
             observation_provider = (
                 _string_field(item, "provider")
@@ -1377,6 +1407,7 @@ def adjudicate_identity_observations(
             not shared_identifiers
             and not title_author_year_match
             and not unique_exact_zotero_title_match
+            and not unique_exact_arxiv_title_match
         ):
             rejected_observations.append(
                 _identity_observation_summary(
@@ -1391,6 +1422,8 @@ def adjudicate_identity_observations(
             acceptance_reason = "shared_identifier"
         elif unique_exact_zotero_title_match:
             acceptance_reason = "unique_exact_zotero_title"
+        elif unique_exact_arxiv_title_match:
+            acceptance_reason = "unique_exact_arxiv_title"
         else:
             acceptance_reason = "title_author_year"
         summary = _identity_observation_summary(
@@ -2344,7 +2377,13 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
     title = normalize_whitespace(str(base.get("title", "")))
     arxiv_id = normalize_whitespace(str(base.get("arxiv_id", "")))
 
-    def append(provider: str, kind: str, value: str, candidate: dict[str, Any] | None) -> None:
+    def append(
+        provider: str,
+        kind: str,
+        value: str,
+        candidate: dict[str, Any] | None,
+        relation: dict[str, str] | None = None,
+    ) -> None:
         if not candidate:
             return
         observation = {
@@ -2352,6 +2391,8 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
             "retrieved_by": {"kind": kind, "value": value},
             "record": deepcopy(candidate),
         }
+        if relation:
+            observation["relation"] = relation
         if observation not in observations:
             observations.append(observation)
 
@@ -2375,11 +2416,26 @@ def collect_metadata_observations(record: dict[str, Any]) -> list[dict[str, Any]
         append("openalex", "title", title, oa)
         cross = choose_best_title_match(title, search_crossref_by_title(title, limit=5))
         append("crossref", "title", title, cross)
-        arxiv = choose_best_title_match(
-            title,
-            safe_fetch_arxiv_entries(search_query=f'ti:"{title}"', max_results=5),
+        arxiv_candidates = safe_fetch_arxiv_entries(
+            search_query=f'ti:"{title}"', max_results=5
         )
-        append("arxiv", "title", title, arxiv)
+        arxiv = choose_best_title_match(title, arxiv_candidates)
+        exact_matches = [
+            candidate
+            for candidate in arxiv_candidates
+            if normalize_identity_title(_string_field(candidate, "title"))
+            == normalize_identity_title(title)
+        ]
+        relation = (
+            {
+                "kind": "arxiv_lookup",
+                "match_kind": "title",
+                "match_resolution": "unique_exact",
+            }
+            if arxiv is not None and len(exact_matches) == 1 and arxiv == exact_matches[0]
+            else None
+        )
+        append("arxiv", "title", title, arxiv, relation)
 
     return observations
 
@@ -2400,10 +2456,29 @@ def enrich_metadata(record: dict[str, Any]) -> dict[str, Any]:
     return apply_identity_confidence(merged)
 
 
-def runtime_config() -> dict[str, Any]:
+def runtime_config(
+    *,
+    explicit_overrides: dict[str, Any] | None = None,
+    cli_overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    resolved = resolve_run_overrides(
+        explicit_overrides=explicit_overrides,
+        cli_overrides=cli_overrides,
+    )
+    if resolved["issues"] or resolved["missing"]:
+        inspection = inspect_configuration()
+        if inspection["state"] != "ready":
+            raise RuntimeError(json.dumps(inspection, ensure_ascii=False, sort_keys=True))
+        resolved = resolve_preferences(
+            explicit_overrides=explicit_overrides,
+            cli_overrides=cli_overrides,
+        )
+        if resolved["issues"] or resolved["missing"]:
+            raise RuntimeError(json.dumps(resolved, ensure_ascii=False, sort_keys=True))
     return {
-        "obsidian_vault": env_config_value("DEEPPAPERNOTE_OBSIDIAN_VAULT"),
-        "papers_dir": env_config_value("DEEPPAPERNOTE_PAPERS_DIR", default="Research/Papers"),
+        "obsidian_vault": "",
+        "papers_dir": "",
+        **resolved["values"],
         "output_dir": env_config_value("DEEPPAPERNOTE_OUTPUT_DIR", default="tmp/DeepPaperNote"),
         "workspace_output_dir": env_config_value(
             "DEEPPAPERNOTE_WORKSPACE_OUTPUT_DIR",
@@ -2413,6 +2488,8 @@ def runtime_config() -> dict[str, Any]:
 
 
 def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
+    if str(config.get("save_mode", "")).strip() == "workspace":
+        return None
     vault = str(config.get("obsidian_vault", "")).strip()
     if not vault:
         return None
@@ -2425,14 +2502,18 @@ def configured_obsidian_vault(config: dict[str, Any]) -> Path | None:
 def require_obsidian_vault(config: dict[str, Any]) -> Path:
     vault_path = configured_obsidian_vault(config)
     if vault_path is None:
-        raise RuntimeError("Missing Obsidian vault configuration. Set DEEPPAPERNOTE_OBSIDIAN_VAULT.")
+        raise RuntimeError("Missing Obsidian Vault in User Configuration or the current Run Override.")
     return vault_path
 
 
 def resolve_note_output_mode(config: dict[str, Any]) -> tuple[str, Path]:
-    vault_path = configured_obsidian_vault(config)
-    if vault_path is not None:
-        return ("obsidian", vault_path)
+    save_mode = str(config.get("save_mode", "")).strip()
+    if save_mode == "obsidian":
+        return ("obsidian", require_obsidian_vault(config))
+    if not save_mode:
+        vault_path = configured_obsidian_vault(config)
+        if vault_path is not None:
+            return ("obsidian", vault_path)
     workspace_root = Path.cwd().resolve()
     output_dir = str(config.get("workspace_output_dir", "DeepPaperNote_output")).strip() or "DeepPaperNote_output"
     output_path = workspace_root / Path(
@@ -2501,9 +2582,9 @@ DOMAIN_SECTION_ALIASES = {"application_domains": "domains"}
 DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
     "domains": [
         {
-            "label": "医療・健康",
+            "label": "医疗健康",
             "aliases": ["healthcare", "medical", "clinical medicine"],
-            "specialized_folders": ["メンタルヘルス"],
+            "specialized_folders": ["心理健康"],
             "keywords": [
                 "clinical",
                 "patient",
@@ -2573,7 +2654,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "ロボティクス",
+            "label": "机器人",
             "aliases": ["robotics", "robotic"],
             "keywords": [
                 "robot",
@@ -2589,7 +2670,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": ["diffusion policy"],
         },
         {
-            "label": "ソフトウェア工学",
+            "label": "软件工程",
             "aliases": ["software engineering"],
             "keywords": [
                 "software engineering",
@@ -2620,8 +2701,8 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "メンタルヘルス",
-            "route_to": "医療・健康",
+            "label": "心理健康",
+            "route_to": "医疗健康",
             "aliases": ["mental health", "psychology", "psychiatry"],
             "keywords": [
                 "depression",
@@ -2636,7 +2717,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "推薦システム",
+            "label": "推荐系统",
             "aliases": ["recommender systems", "recommendation"],
             "keywords": [
                 "recommendation",
@@ -2650,7 +2731,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
     ],
     "fallback_domains": [
         {
-            "label": "大規模言語モデル",
+            "label": "大模型",
             "aliases": ["llm", "large language model", "language model", "foundation model"],
             "keywords": [
                 "large language model",
@@ -2681,7 +2762,7 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
             "methods": [],
         },
         {
-            "label": "機械学習",
+            "label": "机器学习",
             "aliases": ["machine learning", "ml"],
             "keywords": [
                 "machine learning",
@@ -2974,17 +3055,24 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
 
     paper_type, _ = infer_paper_type(title, abstract)
     if paper_type == "clinical_or_psychology_empirical":
-        return "医療・健康"
+        return "医疗健康"
     if paper_type == "AI_method":
-        return "機械学習"
-    return "未分類"
+        return "机器学习"
+    return "未分类"
 
 
 def is_probable_paper_folder(path: Path) -> bool:
     if not path.is_dir():
         return False
-    marker = path / f"{path.name}.md"
-    return marker.exists()
+    return any(
+        (path / marker).exists()
+        for marker in (
+            f"{path.name}.md",
+            f"{path.name}.zh-CN.md",
+            f"{path.name}.en.md",
+            ".deeppapernote.json",
+        )
+    )
 
 
 def existing_domain_dirs(config: dict[str, Any]) -> list[str]:

@@ -1902,10 +1902,17 @@ def http_get_bytes(url: str, *, timeout: int = 60, headers: dict[str, str] | Non
 
 
 def https_ssl_context(url: str) -> ssl.SSLContext | None:
-    if not str(url).lower().startswith("https://") or certifi is None:
+    if not str(url).lower().startswith("https://"):
         return None
     try:
-        return ssl.create_default_context(cafile=certifi.where())
+        # OS の証明書ストアと SSL_CERT_FILE / SSL_CERT_DIR を信頼の起点にする。
+        # 社内 Proxy が SSL インスペクションを行う環境では、社内 Root CA が
+        # OS ストアや SSL_CERT_FILE 経由で提供されるため、certifi 単独では検証に失敗する。
+        context = ssl.create_default_context()
+        if certifi is not None:
+            # 公開 CA の網羅性を保つため certifi のバンドルは追加でロードする
+            context.load_verify_locations(cafile=certifi.where())
+        return context
     except Exception:
         return None
 

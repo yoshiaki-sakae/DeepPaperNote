@@ -22,3 +22,6 @@ CONTEXT.md
 .claude/
 docs/
 /assets/hero-concepts/
+
+# uv のロックファイル（fork ローカルの開発環境用、upstream との差分を避けるため追跡しない）
+uv.lock

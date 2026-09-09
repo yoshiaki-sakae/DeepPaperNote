@@ -2571,6 +2571,21 @@ def resolve_note_asset_dir(note_path: str | Path, asset_subdir: str) -> Path:
 
 
 DOMAIN_RULES_PATH = Path(__file__).resolve().parents[1] / "references" / "domain_rules.yaml"
+# Translations of the hardcoded Chinese fallback labels, applied only when no taxonomy
+# file could be loaded (e.g. the shipped YAML is unreadable). Labels absent here are
+# identical in both languages (法律, 教育, 金融, 生物医学).
+DOMAIN_LABEL_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "ja": {
+        "医疗健康": "医療・健康",
+        "机器人": "ロボティクス",
+        "软件工程": "ソフトウェア工学",
+        "心理健康": "メンタルヘルス",
+        "推荐系统": "推薦システム",
+        "大模型": "大規模言語モデル",
+        "机器学习": "機械学習",
+        "未分类": "未分類",
+    },
+}
 DOMAIN_LIST_KEYS = (
     "aliases",
     "keywords",
@@ -2782,12 +2797,29 @@ DEFAULT_DOMAIN_RULES: dict[str, list[dict[str, Any]]] = {
 }
 
 
-def _copy_default_domain_rules() -> dict[str, list[dict[str, Any]]]:
+def _translate_domain_label(label: str, output_language: str | None) -> str:
+    return DOMAIN_LABEL_TRANSLATIONS.get(output_language or "", {}).get(label, label)
+
+
+def _copy_default_domain_rules(
+    output_language: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    def translate(value: Any) -> str:
+        return _translate_domain_label(str(value), output_language)
+
+    def copy_rule(rule: dict[str, Any]) -> dict[str, Any]:
+        copied: dict[str, Any] = {}
+        for key, value in rule.items():
+            if key in ("label", "route_to"):
+                copied[key] = translate(value)
+            elif key == "specialized_folders":
+                copied[key] = [translate(item) for item in value]
+            else:
+                copied[key] = list(value) if isinstance(value, list) else value
+        return copied
+
     return {
-        section: [
-            {key: list(value) if isinstance(value, list) else value for key, value in rule.items()}
-            for rule in DEFAULT_DOMAIN_RULES[section]
-        ]
+        section: [copy_rule(rule) for rule in DEFAULT_DOMAIN_RULES[section]]
         for section in DOMAIN_SECTIONS
     }
 
@@ -2957,11 +2989,23 @@ def _normalize_domain_rules(
     return normalized
 
 
-def resolve_domain_rules_path() -> Path:
-    """Pick the domain taxonomy file: env override, then the user config directory, then the skill default.
+def shipped_domain_rules_path(output_language: str | None = None) -> Path:
+    """Return the shipped taxonomy: `domain_rules.<lang>.yaml` when present, else the default."""
+    language = (output_language or "").strip()
+    if language:
+        localized = DOMAIN_RULES_PATH.with_name(f"domain_rules.{language}.yaml")
+        if localized.is_file():
+            return localized
+    return DOMAIN_RULES_PATH
 
-    The skill ships Chinese folder labels; a user whose Vault uses another language
-    keeps a translated copy outside the skill so upstream updates never overwrite it.
+
+def resolve_domain_rules_path(output_language: str | None = None) -> Path:
+    """Pick the domain taxonomy file: env override, then the user config directory, then the
+    skill default.
+
+    The default file ships Chinese folder labels and `domain_rules.ja.yaml` ships Japanese
+    ones, chosen by `output_language`; a user who wants other labels keeps a copy outside
+    the skill so upstream updates never overwrite it.
     """
     override = os.environ.get("DEEPPAPERNOTE_DOMAIN_RULES", "").strip()
     if override:
@@ -2969,21 +3013,21 @@ def resolve_domain_rules_path() -> Path:
     user_rules = user_config_path().parent / "domain_rules.yaml"
     if user_rules.is_file():
         return user_rules
-    return DOMAIN_RULES_PATH
+    return shipped_domain_rules_path(output_language)
 
 
-def load_domain_rules() -> dict[str, list[dict[str, Any]]]:
+def load_domain_rules(output_language: str | None = None) -> dict[str, list[dict[str, Any]]]:
     try:
-        rules_path = resolve_domain_rules_path()
+        rules_path = resolve_domain_rules_path(output_language)
         if not rules_path.exists():
-            return _copy_default_domain_rules()
+            return _copy_default_domain_rules(output_language)
         parsed = _parse_domain_rules_yaml(rules_path.read_text(encoding="utf-8-sig"))
         normalized = _normalize_domain_rules(parsed)
         if normalized is None:
-            return _copy_default_domain_rules()
+            return _copy_default_domain_rules(output_language)
         return normalized
     except Exception:
-        return _copy_default_domain_rules()
+        return _copy_default_domain_rules(output_language)
 
 
 def _normalized_domain_label(value: str) -> str:
@@ -3051,9 +3095,11 @@ def _score_domain_for_inference(rule: dict[str, Any], text: str, *, fallback: bo
     )
 
 
-def infer_domain_label(title: str, abstract: str = "") -> str:
+def infer_domain_label(
+    title: str, abstract: str = "", *, output_language: str | None = None
+) -> str:
     lower = normalize_whitespace(f"{title} {abstract}").lower()
-    rules = load_domain_rules()
+    rules = load_domain_rules(output_language)
     scored: list[tuple[int, str]] = []
     for rule in rules["domains"]:
         score = _score_domain_for_inference(rule, lower, fallback=False)
@@ -3073,21 +3119,28 @@ def infer_domain_label(title: str, abstract: str = "") -> str:
 
     paper_type, _ = infer_paper_type(title, abstract)
     if paper_type == "clinical_or_psychology_empirical":
-        return _domain_label_by_alias(rules, "healthcare", "医疗健康")
+        return _domain_label_by_alias(rules, "healthcare", "医疗健康", output_language)
     if paper_type == "AI_method":
-        return _domain_label_by_alias(rules, "machine learning", "机器学习")
-    return _domain_label_by_alias(rules, "unclassified", "未分类")
+        return _domain_label_by_alias(rules, "machine learning", "机器学习", output_language)
+    return _domain_label_by_alias(rules, "unclassified", "未分类", output_language)
 
 
-def _domain_label_by_alias(rules: dict[str, list[dict[str, Any]]], alias: str, default: str) -> str:
+def _domain_label_by_alias(
+    rules: dict[str, list[dict[str, Any]]],
+    alias: str,
+    default: str,
+    output_language: str | None = None,
+) -> str:
     """Resolve a fallback folder label through the loaded taxonomy so translated rules stay in charge."""
     wanted = _normalized_domain_label(alias)
     for section in DOMAIN_SECTIONS:
         for rule in rules[section]:
-            aliases = {_normalized_domain_label(item) for item in _as_string_list(rule.get("aliases"))}
+            aliases = {
+                _normalized_domain_label(item) for item in _as_string_list(rule.get("aliases"))
+            }
             if wanted in aliases:
                 return _domain_route_label(rule)
-    return default
+    return _translate_domain_label(default, output_language)
 
 
 def is_probable_paper_folder(path: Path) -> bool:
@@ -3119,13 +3172,20 @@ def existing_domain_dirs(config: dict[str, Any]) -> list[str]:
     return names
 
 
-def domain_name_score(domain_name: str, label: str, title: str, abstract: str) -> int:
+def domain_name_score(
+    domain_name: str,
+    label: str,
+    title: str,
+    abstract: str,
+    *,
+    output_language: str | None = None,
+) -> int:
     name = domain_name.strip().lower()
     score = 0
     if name == label.lower():
         score += 100
     lower = normalize_whitespace(f"{title} {abstract}").lower()
-    rules = load_domain_rules()
+    rules = load_domain_rules(output_language)
     label_rules = _rules_for_label(rules, label)
     label_is_application = any(section == "domains" for section, _ in label_rules)
     known_fallback_name = any(
@@ -3155,13 +3215,17 @@ def resolve_domain_subdir(
 ) -> str:
     if subdir.strip():
         return subdir.strip()
-    label = infer_domain_label(title, abstract)
+    # Folder labels follow the note's output language (ja -> domain_rules.ja.yaml).
+    output_language = str(config.get("output_language", "")).strip() or None
+    label = infer_domain_label(title, abstract, output_language=output_language)
     existing = existing_domain_dirs(config)
     if existing:
         best_name = ""
         best_score = -1
         for domain_name in existing:
-            score = domain_name_score(domain_name, label, title, abstract)
+            score = domain_name_score(
+                domain_name, label, title, abstract, output_language=output_language
+            )
             if score > best_score:
                 best_name = domain_name
                 best_score = score

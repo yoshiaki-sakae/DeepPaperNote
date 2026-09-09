@@ -475,3 +475,146 @@ def test_domain_fallback_labels_follow_loaded_rules(tmp_path: Path, monkeypatch)
         "An ethnographic study of eighteenth-century poetry circles",
         "An interpretive account of literary sociability.",
     ) == "未分類"
+
+
+# --- 同梱の日本語ドメイン規則（フォルダ名の日本語化） ---
+
+SHIPPED_JA_DOMAIN_RULES = (
+    Path(__file__).resolve().parents[1] / "skills/deeppapernote/references/domain_rules.ja.yaml"
+)
+
+
+@pytest.fixture
+def no_user_domain_rules(monkeypatch, configured_user_home: Path) -> Path:
+    """ENV も ~/.deeppapernote/domain_rules.yaml も存在しない、素の状態を作る。"""
+    monkeypatch.delenv("DEEPPAPERNOTE_DOMAIN_RULES", raising=False)
+    user_rules = configured_user_home.parent / "domain_rules.yaml"
+    assert not user_rules.exists()
+    return user_rules
+
+
+def test_shipped_japanese_domain_rules_cover_every_default_label() -> None:
+    """同梱の ja 規則は zh-CN 規則と同じ alias 集合を持ち、ラベルは全て日本語である。"""
+    import common
+
+    zh = common._parse_domain_rules_yaml(common.DOMAIN_RULES_PATH.read_text(encoding="utf-8-sig"))
+    ja = common._parse_domain_rules_yaml(SHIPPED_JA_DOMAIN_RULES.read_text(encoding="utf-8-sig"))
+    assert common._normalize_domain_rules(ja) is not None
+
+    def alias_set(rules: dict) -> set[str]:
+        return {
+            alias.lower()
+            for section in common.DOMAIN_SECTIONS
+            for rule in rules.get(section, [])
+            for alias in rule.get("aliases", [])
+        }
+
+    # ja は zh-CN の alias を全て持ち、さらに unclassified を明示する
+    assert alias_set(zh) <= alias_set(ja)
+    assert "unclassified" in alias_set(ja)
+
+    zh_labels = {rule["label"] for section in common.DOMAIN_SECTIONS for rule in zh[section]}
+    ja_labels = {rule["label"] for section in common.DOMAIN_SECTIONS for rule in ja[section]}
+    # 日中で表記が同じラベル（法律・教育・金融・生物医学）以外は、中国語のまま残っていないこと
+    shared = {"法律", "教育", "金融", "生物医学"}
+    assert (zh_labels & ja_labels) <= shared
+    assert {"医療・健康", "機械学習", "大規模言語モデル", "未分類"} <= ja_labels
+
+
+def test_infer_domain_label_uses_shipped_japanese_rules_for_ja(no_user_domain_rules: Path) -> None:
+    import common
+
+    assert common.infer_domain_label(
+        "Deep learning for depression screening", "patient cohort", output_language="ja"
+    ) == "医療・健康"
+    assert common.infer_domain_label(
+        "A neural network for image denoising", output_language="ja"
+    ) == "機械学習"
+    assert common.infer_domain_label(
+        "Diffusion Policy for Robot Manipulation", "robotic control", output_language="ja"
+    ) == "ロボティクス"
+    # 言語未指定・zh-CN では従来どおり中国語ラベル
+    assert common.infer_domain_label("A neural network for image denoising") == "机器学习"
+    assert common.infer_domain_label(
+        "A neural network for image denoising", output_language="zh-CN"
+    ) == "机器学习"
+
+
+def test_resolve_domain_subdir_follows_config_output_language(
+    tmp_path: Path, no_user_domain_rules: Path
+) -> None:
+    """write_obsidian_note.py が渡す config の output_language でフォルダ名の言語が決まる。"""
+    import common
+
+    vault = tmp_path / "vault"
+    (vault / "Research" / "Papers").mkdir(parents=True)
+    base = {"save_mode": "obsidian", "obsidian_vault": str(vault), "papers_dir": "Research/Papers"}
+
+    assert common.resolve_domain_subdir(
+        {**base, "output_language": "ja"}, title="A neural network for image denoising"
+    ) == "機械学習"
+    assert common.resolve_domain_subdir(
+        {**base, "output_language": "zh-CN"}, title="A neural network for image denoising"
+    ) == "机器学习"
+
+
+def test_resolve_domain_subdir_ja_still_reuses_existing_vault_folder(
+    tmp_path: Path, no_user_domain_rules: Path
+) -> None:
+    """Vault に既存フォルダがあれば、言語に関係なくそれを再利用する（既存挙動の維持）。"""
+    import common
+
+    vault = tmp_path / "vault"
+    (vault / "Research" / "Papers" / "Machine Learning").mkdir(parents=True)
+    config = {
+        "save_mode": "obsidian",
+        "obsidian_vault": str(vault),
+        "papers_dir": "Research/Papers",
+        "output_language": "ja",
+    }
+    assert common.resolve_domain_subdir(
+        config, title="A neural network for image denoising"
+    ) == "Machine Learning"
+
+
+def test_user_overrides_still_beat_shipped_japanese_rules(
+    tmp_path: Path, monkeypatch, no_user_domain_rules: Path
+) -> None:
+    import common
+
+    custom = JAPANESE_DOMAIN_RULES.replace("label: 機械学習", "label: ML研究")
+    rules_path = tmp_path / "custom.yaml"
+    rules_path.write_text(custom, encoding="utf-8")
+    monkeypatch.setenv("DEEPPAPERNOTE_DOMAIN_RULES", str(rules_path))
+    assert common.infer_domain_label(
+        "A neural network for image denoising", output_language="ja"
+    ) == "ML研究"
+
+    monkeypatch.delenv("DEEPPAPERNOTE_DOMAIN_RULES")
+    no_user_domain_rules.write_text(custom, encoding="utf-8")
+    assert common.infer_domain_label(
+        "A neural network for image denoising", output_language="ja"
+    ) == "ML研究"
+
+
+def test_ja_fallback_labels_stay_japanese_when_shipped_rules_are_unreadable(
+    tmp_path: Path, monkeypatch, no_user_domain_rules: Path
+) -> None:
+    """同梱 YAML が壊れていても、ja の最終フォールバックラベルが中国語に戻らない。"""
+    import common
+
+    broken = tmp_path / "domain_rules.ja.yaml"
+    broken.write_text("domains: [\n", encoding="utf-8")
+    monkeypatch.setattr(common, "DOMAIN_RULES_PATH", tmp_path / "domain_rules.yaml")
+
+    label = common.infer_domain_label(
+        "An ethnographic study of eighteenth-century poetry circles",
+        "An interpretive account of literary sociability.",
+        output_language="ja",
+    )
+    assert label == "未分類"
+    assert common.infer_domain_label(
+        "A new encoder-decoder model with attention for translation",
+        "We propose a model architecture and train it end to end; ablations show gains.",
+        output_language="ja",
+    ) == "機械学習"

@@ -1,0 +1,209 @@
+# Japanese domain routing taxonomy, selected automatically when output_language is ja.
+# Same aliases/keywords as domain_rules.yaml; only folder labels are translated.
+# Copy to ~/.deeppapernote/domain_rules.yaml (or point DEEPPAPERNOTE_DOMAIN_RULES at a copy) to customize.
+# Application domains are tried before fallback method domains.
+domains:
+  - label: 医療・健康
+    aliases:
+      - healthcare
+      - medical
+      - clinical medicine
+    specialized_folders:
+      - メンタルヘルス
+    keywords:
+      - clinical
+      - patient
+      - patients
+      - depression
+      - anxiety
+      - mental health
+      - psychiatric
+      - psychology
+      - therapy
+      - counseling
+      - symptom
+      - diagnosis
+      - screening
+      - hospital
+      - healthcare
+      - medical
+    methods: []
+
+  - label: 法律
+    aliases:
+      - legal
+      - law
+    keywords:
+      - legal
+      - law
+      - court
+      - judge
+      - contract
+      - statute
+      - regulation
+      - litigation
+      - case law
+    methods: []
+
+  - label: 教育
+    aliases:
+      - education
+      - educational
+    keywords:
+      - education
+      - student
+      - teacher
+      - classroom
+      - curriculum
+      - tutoring
+      - learning analytics
+      - pedagogy
+    methods: []
+
+  - label: 金融
+    aliases:
+      - finance
+      - financial
+    keywords:
+      - finance
+      - financial
+      - stock
+      - market
+      - trading
+      - portfolio
+      - risk
+      - credit
+      - banking
+      - investment
+    methods: []
+
+  - label: ロボティクス
+    aliases:
+      - robotics
+      - robotic
+    keywords:
+      - robot
+      - robotics
+      - robotic
+      - manipulation
+      - navigation
+      - control policy
+      - locomotion
+      - autonomous driving
+      - embodied
+    methods:
+      - diffusion policy
+
+  - label: ソフトウェア工学
+    aliases:
+      - software engineering
+    keywords:
+      - software engineering
+      - code generation
+      - program repair
+      - bug
+      - repository
+      - developer
+      - code review
+      - test generation
+      - compiler
+    methods: []
+
+  - label: 生物医学
+    aliases:
+      - biomedical
+      - bioinformatics
+    keywords:
+      - biomedical
+      - genomics
+      - protein
+      - drug discovery
+      - molecular
+      - cell
+      - gene
+      - bioinformatics
+    methods: []
+
+  - label: メンタルヘルス
+    route_to: 医療・健康
+    aliases:
+      - mental health
+      - psychology
+      - psychiatry
+    keywords:
+      - depression
+      - anxiety
+      - mental health
+      - psychiatric
+      - psychology
+      - therapy
+      - counseling
+      - symptom
+    methods: []
+
+  - label: 推薦システム
+    aliases:
+      - recommender systems
+      - recommendation
+    keywords:
+      - recommendation
+      - recommender
+      - ctr prediction
+      - ranking system
+      - personalization
+    methods: []
+
+fallback_domains:
+  - label: 大規模言語モデル
+    aliases:
+      - llm
+      - large language model
+      - language model
+      - foundation model
+    keywords:
+      - large language model
+      - llm
+      - foundation model
+      - gpt
+      - transformer
+      - instruction tuning
+      - pretrain
+      - pre-training
+      - language model
+      - agent
+      - multi-agent
+      - multi agent
+      - reasoning
+      - multimodal
+      - retrieval-augmented generation
+      - rag
+      - in-context learning
+      - long-context
+      - long context
+      - mixture-of-experts
+      - mixture of experts
+      - moe
+      - alignment
+      - rlhf
+    methods: []
+
+  - label: 機械学習
+    aliases:
+      - machine learning
+      - ml
+    keywords:
+      - machine learning
+      - deep learning
+      - neural network
+      - representation learning
+      - reinforcement learning
+      - computer vision
+      - graph neural network
+      - speech recognition
+    methods: []
+
+  - label: 未分類
+    aliases:
+      - unclassified
+    keywords: []
+    methods: []
